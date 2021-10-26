@@ -1,3 +1,5 @@
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -6,11 +8,13 @@ public class User {
     private String userId;
     private ChatRoom currentRoom;
     private List<ChatRoom> ownRooms;
+    private final BufferedWriter bw;
 
-    public User(String userId, ChatRoom currentRoom) {
+    public User(String userId, ChatRoom currentRoom, BufferedWriter bw) {
         this.userId = userId;
         this.currentRoom = currentRoom;
         this.ownRooms = Collections.synchronizedList(new ArrayList<ChatRoom>());
+        this.bw = bw;
     }
 
     public String getUserId() {
@@ -35,6 +39,14 @@ public class User {
 
     public void setOwnRooms(List<ChatRoom> ownRooms) {
         this.ownRooms = ownRooms;
+    }
+
+    /**
+     * 任何需要和client发任何消息的场景都用到这个方法。
+     */
+    public synchronized void sendMsg(String msg) throws IOException {
+        bw.write(msg);
+        bw.flush();
     }
 
     @Override

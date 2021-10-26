@@ -2,6 +2,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import protocal.c2s.HostChange;
 import protocal.c2s.Join;
+import protocal.s2c.RoomChange;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -39,9 +40,9 @@ public class ClientConnThread extends Thread{
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     switch (type){
-                        case ("join"):
-                            Join join = mapper.readValue(line, Join.class);
-                            System.out.println("join");
+                        case ("roomchange"):
+                            RoomChange roomChange = mapper.readValue(line, RoomChange.class);
+                            System.out.println(roomChange);
                             break;
                         case ("who"):
                             System.out.println("who");

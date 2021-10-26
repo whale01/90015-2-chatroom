@@ -30,6 +30,7 @@ public class ServerConnThread extends Thread {
 
     @Override
     public void run() {
+        System.out.println("A server conn thread started");
         String line = null;
         while (socket.isConnected()){
             try {
@@ -44,7 +45,7 @@ public class ServerConnThread extends Thread {
                     switch (type){
                         case ("join"):
                             Join join = mapper.readValue(line, Join.class);
-                            System.out.println("join");
+                            serverThread.handleJoin(join,user);
                             break;
                         case ("who"):
                             System.out.println("who");
