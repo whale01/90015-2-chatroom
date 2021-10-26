@@ -2,13 +2,14 @@ package protocal.c2s;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.io.Serializable;
-
-public class HostChange implements Serializable {
+public class HostChange{
     @JsonProperty("type")
     private String type;
     @JsonProperty("content")
     private String content;
+
+    public HostChange() {
+    }
 
     public HostChange(String content) {
         this.type = "hostchange";

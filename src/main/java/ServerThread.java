@@ -11,10 +11,15 @@ public class ServerThread extends Thread{
 
     private ServerSocket serverSocket;
     private int pPort;
+    private Peer peer;
 
+    public ObjectMapper getMapper() {
+        return mapper;
+    }
 
-    public ServerThread(int pPort) {
+    public ServerThread(int pPort, Peer peer) {
         this.pPort = pPort;
+        this.peer = peer;
     }
 
     @Override
@@ -31,17 +36,17 @@ public class ServerThread extends Thread{
                 Socket socket = serverSocket.accept(); //a new connection request
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)); // set encoding as UTF8
                 BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-                User user = new User(socket.getInetAddress().getHostAddress(), null);
-                System.out.println("socket.getInetAddress().getHostAddress()" + socket.getInetAddress().getHostAddress());//TODO: testing
-                System.out.println("socket.getLocalPort():" + socket.getLocalPort());//TODO: testing
-                System.out.println("socket.getPort():" + socket.getPort());//TODO: testing
-                System.out.println("socket.getInetAddress():" + socket.getInetAddress());//TODO: testing
-                System.out.println("socket.getLocalSocketAddress():" + socket.getLocalSocketAddress());//TODO: testing
-                System.out.println("socket.getLocalAddress():" + socket.getLocalAddress());//TODO: testing
-                System.out.println("socket.getRemoteSocketAddress():" + socket.getRemoteSocketAddress());//TODO: testing
+                User user = new User(socket.getRemoteSocketAddress()+"", null);
+                new ServerConnThread(socket,br, this, user).start();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
+
+    public void handleHostChange(HostChange hostChange, User user) {
+        String host = hostChange.getContent();
+    }
+
+
 }
