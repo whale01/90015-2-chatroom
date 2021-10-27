@@ -23,6 +23,9 @@ public class RoomChange {
     @JsonProperty("roomid")
     private String roomid;
 
+    public RoomChange() {
+    }
+
     public RoomChange(String identity, String former, String roomid) {
         this.type = "roomchange";
         this.identity = identity;
@@ -62,13 +65,4 @@ public class RoomChange {
         this.roomid = roomid;
     }
 
-    @Override
-    public String toString() {
-        return "RoomChange{" +
-                "type='" + type + '\'' +
-                ", identity='" + identity + '\'' +
-                ", former='" + former + '\'' +
-                ", roomid='" + roomid + '\'' +
-                '}';
-    }
 }

@@ -4,13 +4,15 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import protocal.Commands;
-import protocal.c2s.HostChange;
 import protocal.c2s.Join;
+import protocal.c2s.List;
+import protocal.c2s.Who;
+import protocal.s2c.Room;
 import protocal.s2c.RoomContents;
+import protocal.s2c.RoomList;
 
 import java.io.*;
 import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -62,7 +64,7 @@ public class Peer {
 
     private void act() throws IOException, InterruptedException {
         self = new User("localhost:"+pPort,null,bw); //不会给自己发消息，bw设为Null
-        ServerThread server = new ServerThread(pPort, this,chatRooms);
+        ServerThread server = new ServerThread(pPort, chatRooms);
         server.start();
         Scanner sc = new Scanner(System.in);
         while (sc.hasNext()) {
@@ -97,12 +99,20 @@ public class Peer {
                             whoLocal(splitLine);
                         }
                         break;
+                    case Commands.LIST:
+                        if(connected){
+                            listRemote(splitLine);
+                        }else {
+                            listLocal(splitLine);
+                        }
+                        break;
                     case Commands.QUIT:
                         if(connected){
                             quitRemote();
                         }else{
                             quitLocal(splitLine);
                         }
+                        break;
                 }
             }
             System.out.print(">");
@@ -136,7 +146,7 @@ public class Peer {
             }
             bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
             br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-            bw.write(mapper.writeValueAsString(new HostChange(socket.getLocalAddress() + ":" + pPort)));
+            bw.write("" + System.lineSeparator());
             bw.flush();
             new ClientConnThread(socket, br, this).start();
             connected = true;
@@ -223,35 +233,38 @@ public class Peer {
     private void joinRemote(String[] splitLine) throws IOException {
         if(splitLine.length == 1){
             Join join = new Join("");
-            bw.write(mapper.writeValueAsString(join));
+            bw.write(mapper.writeValueAsString(join) + System.lineSeparator()); //使用bw需要在消息后面加上newline才能被br.readLine()读到
+            bw.flush();
         }
         else if(splitLine.length == 2){
             String roomToJoin = splitLine[1];
             Join join = new Join(roomToJoin);
-            bw.write(mapper.writeValueAsString(join));
+            bw.write(mapper.writeValueAsString(join) + System.lineSeparator());
+            bw.flush();
         }
         else {
             System.err.println("JOIN REMOTE: Wrong number of args");
         }
-        bw.flush();
+
     }
 
     /**
      * 本地命令。
      * 返回本地某房间内的人员。
      */
-    private void whoLocal(String[] splitLine) {
+    private void whoLocal(String[] splitLine) throws JsonProcessingException {
         if(splitLine.length == 2){
             String roomToCount = splitLine[1];
             if(chatRooms.containsKey(roomToCount)){
-                List<String> members = new ArrayList<>();
+                java.util.List members = new ArrayList<>();
                 synchronized (chatRooms) {
                     ChatRoom roomToC = chatRooms.get(roomToCount);
                     for (User user : roomToC.getMembers()) {
                         members.add(user.getUserId());
                     }
                 }
-                System.out.println(new RoomContents(roomToCount, members));
+                String s = mapper.writeValueAsString(new RoomContents(roomToCount, members));
+                System.out.println(s);
             }else{
                 System.err.println("WHO LOCAL: No existing room as per requested");
             }
@@ -262,8 +275,16 @@ public class Peer {
     }
 
 
-    private void whoRemote(String[] splitLine) {
-
+    private void whoRemote(String[] splitLine) throws IOException {
+        if(splitLine.length == 2){
+            String roomToAsk = splitLine[1];
+            Who who = new Who(roomToAsk);
+            bw.write(mapper.writeValueAsString(who) + System.lineSeparator());
+            bw.flush();
+        }
+        else{
+            System.err.println("WHO REMOTE: Wrong number of args");
+        }
     }
 
     /**
@@ -281,6 +302,37 @@ public class Peer {
 
     private void quitRemote() {
 
+    }
+
+    /**
+     * 本地命令。
+     */
+    private void listLocal(String[] splitLine) throws JsonProcessingException {
+        if(splitLine.length == 1){
+            java.util.List rooms = new ArrayList<>();
+            synchronized (chatRooms) {
+                for (ChatRoom chatRoom: chatRooms.values()) {
+                    String roomId = chatRoom.getRoomId();
+                    int count = chatRoom.getMembers().size();
+                    Room room = new Room(roomId,count);
+                    rooms.add(room);
+                }
+            }
+            String msg = mapper.writeValueAsString(new RoomList(rooms));
+            System.out.println(msg);
+        }else{
+            System.err.println("LIST LOCAL: No args needed for #list");
+        }
+    }
+
+    private void listRemote(String[] splitLine) throws IOException {
+        if(splitLine.length == 1){
+            String msg = mapper.writeValueAsString(new List());
+            bw.write(msg + System.lineSeparator());
+            bw.flush();
+        }else {
+            System.err.println("LIST REMOTE: No args needed for #list");
+        }
     }
 
 

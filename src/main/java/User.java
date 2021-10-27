@@ -45,7 +45,7 @@ public class User {
      * 任何需要和client发任何消息的场景都用到这个方法。
      */
     public synchronized void sendMsg(String msg) throws IOException {
-        bw.write(msg);
+        bw.write(msg + System.lineSeparator());
         bw.flush();
     }
 

@@ -45,12 +45,4 @@ public class RoomContents {
         this.identities = identities;
     }
 
-    @Override
-    public String toString() {
-        return "RoomContents{" +
-                "type='" + type + '\'' +
-                ", roomid='" + roomid + '\'' +
-                ", identities=" + identities +
-                '}';
-    }
 }
