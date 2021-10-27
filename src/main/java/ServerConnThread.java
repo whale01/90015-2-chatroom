@@ -1,9 +1,6 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import protocal.c2s.HostChange;
-import protocal.c2s.Join;
-import protocal.c2s.List;
-import protocal.c2s.Who;
+import protocal.c2s.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -47,24 +44,26 @@ public class ServerConnThread extends Thread {
                     switch (type){
                         case ("join"):
                             Join join = mapper.readValue(line, Join.class);
-                            System.out.println(join);
+                            System.out.println(line);
                             serverThread.handleJoin(join,user);
                             break;
                         case ("who"):
                             Who who = mapper.readValue(line, Who.class);
-                            System.out.println(who);
+                            System.out.println(line);
                             serverThread.handleWho(who,user);
                             break;
                         case ("list"):
                             List list = mapper.readValue(line, List.class);
-                            System.out.println(list);
+                            System.out.println(line);
                             serverThread.handleList(user);
                             break;
                         case ("quit"):
-                            System.out.println("quit");
+                            Quit quit = mapper.readValue(line, Quit.class);
+                            System.out.println(line);
+                            serverThread.handleQuit(user);
                             break;
                         case ("message"):
-                            System.out.println("message");
+                            //TODO
                             break;
                         case ("hostchange"):
                             HostChange hostChange = mapper.readValue(line, HostChange.class);

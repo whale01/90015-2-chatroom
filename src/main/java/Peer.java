@@ -6,6 +6,7 @@ import org.kohsuke.args4j.Option;
 import protocal.Commands;
 import protocal.c2s.Join;
 import protocal.c2s.List;
+import protocal.c2s.Quit;
 import protocal.c2s.Who;
 import protocal.s2c.Room;
 import protocal.s2c.RoomContents;
@@ -108,7 +109,7 @@ public class Peer {
                         break;
                     case Commands.QUIT:
                         if(connected){
-                            quitRemote();
+                            quitRemote(splitLine);
                         }else{
                             quitLocal(splitLine);
                         }
@@ -189,7 +190,7 @@ public class Peer {
      * 本地命令。
      * 没连接的状态下，
      * 1.加入本地的某房间（自己创建的）
-     * 2.或者离开当前房间。
+     * 2.或者离开当前房间（设置为null）。
      */
     private void joinLocal(String[] splitLine) {
         if(splitLine.length == 1){
@@ -289,7 +290,8 @@ public class Peer {
 
     /**
      * 本地命令。
-     *
+     * 本地的quit命令只是把自己从当前房间退出
+     * 所以直接沿用joinLocal方法。
      */
     private void quitLocal(String[] splitLine) {
         if(splitLine.length == 1){
@@ -300,8 +302,19 @@ public class Peer {
         }
     }
 
-    private void quitRemote() {
-
+    /**
+     * 远程quit
+     * 发送quit消息
+     * @param splitLine
+     */
+    private void quitRemote(String[] splitLine) throws IOException {
+        if(splitLine.length == 1){
+            String msg = mapper.writeValueAsString(new Quit());
+            bw.write(msg + System.lineSeparator());
+            bw.flush();
+        }else{
+            System.err.println("QUIT REMOTE: No args needed");
+        }
     }
 
     /**
@@ -335,53 +348,4 @@ public class Peer {
         }
     }
 
-
-//    public class ServerThread extends Thread{
-//        private ObjectMapper mapper = new ObjectMapper();
-//
-//        private ServerSocket serverSocket;
-//        private int pPort;
-//        private Peer peer;
-//
-//        public ObjectMapper getMapper() {
-//            return mapper;
-//        }
-//
-//        public ServerThread(int pPort, Peer peer) {
-//            this.pPort = pPort;
-//            this.peer = peer;
-//        }
-//
-//        @Override
-//        public void run() {
-//            System.out.printf("\nlistening on port %d\n", pPort);
-//            System.out.print(">");
-//            try {
-//                serverSocket = new ServerSocket(pPort);
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//            while (true){
-//                try {
-//                    Socket socket = serverSocket.accept(); //a new connection request
-//                    BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)); // set encoding as UTF8
-//                    BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-//                    User user = new User(socket.getRemoteSocketAddress()+"", null);
-//                    new ServerConnThread(socket,br, this, user).start();
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }
-//
-//        public void handleHostChange(HostChange hostChange, User user) {
-//            String host = hostChange.getContent();
-//            //TODO
-//        }
-//
-//
-//        public void handleJoin(Join join, User user) {
-//
-//        }
-//    }
 }
