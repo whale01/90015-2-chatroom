@@ -4,10 +4,8 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import protocal.Commands;
-import protocal.c2s.Join;
+import protocal.c2s.*;
 import protocal.c2s.List;
-import protocal.c2s.Quit;
-import protocal.c2s.Who;
 import protocal.s2c.Room;
 import protocal.s2c.RoomContents;
 import protocal.s2c.RoomList;
@@ -114,6 +112,15 @@ public class Peer {
                             quitLocal(splitLine);
                         }
                         break;
+                    case Commands.LISTNEIGHBORS:
+                        if (connected) {
+                            listNeighbour();
+                        }
+                        break;
+                    case Commands.SEARCHNETWORK:
+                        break;
+                    default:
+                        System.out.println("INVALID COMMAND!");
                 }
             }
             System.out.print(">");
@@ -147,7 +154,10 @@ public class Peer {
             }
             bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
             br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-            bw.write("" + System.lineSeparator());
+            String localIP = InetAddress.getLocalHost().toString().split("/")[1];
+            HostChange hostChange = new HostChange(localIP + ":" + pPort);
+            System.out.println(mapper.writeValueAsString(hostChange));
+            bw.write(mapper.writeValueAsString(hostChange) + System.lineSeparator());
             bw.flush();
             new ClientConnThread(socket, br, this).start();
             connected = true;
@@ -345,6 +355,20 @@ public class Peer {
             bw.flush();
         }else {
             System.err.println("LIST REMOTE: No args needed for #list");
+        }
+    }
+
+    /**
+     * Send out list_neighbour command
+     */
+    private void listNeighbour() {
+        try {
+            ListNeighbours listNeighbours = new ListNeighbours();
+            System.out.println(mapper.writeValueAsString(listNeighbours));
+            bw.write(mapper.writeValueAsString(listNeighbours) + System.lineSeparator());
+            bw.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 

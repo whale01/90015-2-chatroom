@@ -18,15 +18,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class HostChange{
     @JsonProperty("type")
     private String type;
-    @JsonProperty("content")
-    private String content;
+    @JsonProperty("host")
+    private String host;
 
     public HostChange() {
     }
 
-    public HostChange(String content) {
+    public HostChange(String host) {
         this.type = "hostchange";
-        this.content = content;
+        this.host = host;
     }
 
     public String getType() {
@@ -37,12 +37,12 @@ public class HostChange{
         this.type = type;
     }
 
-    public String getContent() {
-        return content;
+    public String getHost() {
+        return host;
     }
 
-    public void setContent(String content) {
-        this.content = content;
+    public void setHost(String host) {
+        this.host = host;
     }
 
 

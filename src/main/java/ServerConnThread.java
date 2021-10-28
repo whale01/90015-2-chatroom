@@ -34,11 +34,8 @@ public class ServerConnThread extends Thread {
         while (socket.isConnected()){
             try {
                 line = br.readLine();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            if(null != line){
-                try {
+                if(line != null){
+                    System.out.println(line);
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     switch (type){
@@ -70,12 +67,15 @@ public class ServerConnThread extends Thread {
                             serverThread.handleHostChange(hostChange,user);
                             break;
                         case ("listneighbors"):
-
+                            serverThread.handleListNeighbour(user);
                             break;
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } else {
+                    System.out.println("Closing connection.");
+                    return;
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }

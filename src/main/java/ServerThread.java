@@ -3,10 +3,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import protocal.c2s.HostChange;
 import protocal.c2s.Join;
 import protocal.c2s.Who;
-import protocal.s2c.Room;
-import protocal.s2c.RoomChange;
-import protocal.s2c.RoomContents;
-import protocal.s2c.RoomList;
+import protocal.s2c.*;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -21,6 +18,7 @@ public class ServerThread extends Thread {
 
     private ServerSocket serverSocket;
     private int pPort;
+    private ArrayList<User> users;
     private final Map<String, ChatRoom> chatRooms;
 
     public ObjectMapper getMapper() {
@@ -30,6 +28,7 @@ public class ServerThread extends Thread {
     public ServerThread(int pPort, Map<String, ChatRoom> chatRooms) {
         this.pPort = pPort;
         this.chatRooms = chatRooms;
+        this.users = new ArrayList<>();
     }
 
     @Override
@@ -38,28 +37,24 @@ public class ServerThread extends Thread {
         System.out.print(">");
         try {
             serverSocket = new ServerSocket(pPort);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        while (true) {
-            try {
+            while (true) {
                 Socket socket = serverSocket.accept(); //a new connection request
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)); // set encoding as UTF8
                 BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-                String str = br.readLine();
-                System.out.println(str);
                 User user = new User(socket.getRemoteSocketAddress() + "", null, bw);
+                users.add(user);
                 ServerConnThread serverConnThread = new ServerConnThread(socket, br, this, user);
                 serverConnThread.start();
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
     public void handleHostChange(HostChange hostChange, User user) {
-        String host = hostChange.getContent();
-        //TODO
+        String host = hostChange.getHost();
+        user.setUserId(host);
+        System.out.printf("%s has connected.\n", host);
     }
 
 
@@ -146,5 +141,18 @@ public class ServerThread extends Thread {
             System.err.println("HANDLE QUIT: No room to quit from.");
         }
 
+    }
+
+    public void handleListNeighbour(User currUser) throws IOException {
+        System.out.println("Handle list neighbors");
+        ArrayList<String> identities = new ArrayList<>();
+        for (User user: users) {
+            if (!user.getUserId().equals(currUser.getUserId())) {
+                identities.add(user.getUserId());
+            }
+        }
+        System.out.println(identities);
+        String msg = mapper.writeValueAsString(new Neighbors(identities));
+        currUser.sendMsg(msg);
     }
 }
