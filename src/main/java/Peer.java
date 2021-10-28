@@ -42,6 +42,7 @@ public class Peer {
         peer.parseArgs(args);
         try {
             peer.act();
+            System.out.println("kkk");
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
