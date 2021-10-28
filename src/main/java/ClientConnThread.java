@@ -19,6 +19,7 @@ public class ClientConnThread extends Thread{
     private Peer peer;
     private Socket socket;
     private BufferedReader br;
+    private Boolean quitFlag = false;
 
     public  ClientConnThread(Socket socket,BufferedReader br, Peer peer) {
         this.socket = socket;
@@ -31,7 +32,7 @@ public class ClientConnThread extends Thread{
     public void run() {
         System.out.println("A client conn thread started");
         String line = null;
-        while (socket.isConnected()){
+        while (socket.isConnected() && !quitFlag){
             try {
                 line = br.readLine();
             } catch (IOException e) {
@@ -44,7 +45,7 @@ public class ClientConnThread extends Thread{
                     switch (type){
                         case ("roomchange"):
                             RoomChange roomChange = mapper.readValue(line, RoomChange.class);
-                            System.out.println(mapper.writeValueAsString(roomChange)); //TODO: 目前client接收到response都打印出来。
+                            handleRoomChange(roomChange);
                             break;
                         case ("roomcontents"):
                             RoomContents roomContents = mapper.readValue(line, RoomContents.class);
@@ -59,10 +60,44 @@ public class ClientConnThread extends Thread{
                             System.out.println(mapper.writeValueAsString(roomList));
                             break;
                     }
-                } catch (IOException e) {
+                } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                 }
             }
         }
     }
+
+    /**
+     * Deal with various cases of roomchange msg received.
+     * Scenario 1: join a valid room
+     * Scenario 2: #join to leave current room
+     * Scenario 3: #quit to leave current room and disconnect
+     */
+    private void handleRoomChange(RoomChange roomChange) throws IOException, InterruptedException {
+        String roomid = roomChange.getRoomid();
+        assert roomid != null;
+        Boolean quitRemoteSent = peer.getQuitFlag();
+        if(roomid.equals("") && !quitRemoteSent){
+            //Scenario 2
+            System.out.println(mapper.writeValueAsString(roomChange)); //TODO: 目前client接收到response都打印出来。
+            System.out.println("Scenario 2: #join to leave current room");
+        }
+        else if(roomid.equals("") && quitRemoteSent){
+            //Scenario 3
+            System.out.println(mapper.writeValueAsString(roomChange)); //TODO: 目前client接收到response都打印出来。
+            System.out.println("Scenario 3: #quit to leave current room and disconnect");
+            socket.close();
+            socket = null;
+            quitFlag = true;
+//            peer.setQuitFlag(true);
+            peer.setConnected(false);
+        }
+        else{
+            //Scenario 1
+            System.out.println(mapper.writeValueAsString(roomChange)); //TODO: 目前client接收到response都打印出来。
+            System.out.println("Scenario 1: join a valid room");
+
+        }
+    }
+
 }

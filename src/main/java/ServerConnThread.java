@@ -19,6 +19,8 @@ public class ServerConnThread extends Thread {
     private ServerThread serverThread;
     private User user;
 
+    private Boolean quitFlag = false;
+
     public ServerConnThread(Socket socket, BufferedReader br, ServerThread serverThread, User user){
         this.socket = socket;
         this.br = br;
@@ -31,7 +33,7 @@ public class ServerConnThread extends Thread {
     public void run() {
         System.out.println("A server conn thread started");
         String line = null;
-        while (socket.isConnected()){
+        while (socket.isConnected() && !quitFlag){
             try {
                 line = br.readLine();
             } catch (IOException e) {
@@ -61,6 +63,7 @@ public class ServerConnThread extends Thread {
                             Quit quit = mapper.readValue(line, Quit.class);
                             System.out.println(line);
                             serverThread.handleQuit(user);
+                            quitFlag = true;
                             break;
                         case ("message"):
                             //TODO

@@ -9,6 +9,7 @@ import protocal.c2s.List;
 import protocal.c2s.Quit;
 import protocal.c2s.Who;
 import protocal.s2c.Room;
+import protocal.s2c.RoomChange;
 import protocal.s2c.RoomContents;
 import protocal.s2c.RoomList;
 
@@ -32,6 +33,9 @@ public class Peer {
     private User self;
 
     private Boolean connected = false;
+    private Boolean quitFlag = false;
+
+    private ClientConnThread clientConnThread;
 
     private ObjectMapper mapper = new ObjectMapper();
 
@@ -44,7 +48,6 @@ public class Peer {
         peer.parseArgs(args);
         try {
             peer.act();
-            System.out.println("kkk");
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -127,6 +130,10 @@ public class Peer {
      * 并新建一个ClientConnThread用于监听server的消息回复
      */
     private void connect(String[] splitLine) throws IOException {
+        if(socket != null){
+            System.err.println("CONNECT: Already have a TCP connection");
+            return;
+        }
         if (splitLine.length == 2 || splitLine.length == 3) {
             String[] splitArg = splitLine[1].split(":");
             String remoteAddress = splitArg[0];
@@ -148,9 +155,8 @@ public class Peer {
             }
             bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
             br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-            bw.write("" + System.lineSeparator());
-            bw.flush();
-            new ClientConnThread(socket, br, this).start();
+            clientConnThread = new ClientConnThread(socket, br, this);
+            clientConnThread.start();
             connected = true;
         } else {
             System.err.println("CONNECT: Wrong number of args");
@@ -313,6 +319,7 @@ public class Peer {
             String msg = mapper.writeValueAsString(new Quit());
             bw.write(msg + System.lineSeparator());
             bw.flush();
+            quitFlag = true;
         }else{
             System.err.println("QUIT REMOTE: No args needed");
         }
@@ -349,4 +356,16 @@ public class Peer {
         }
     }
 
+
+    public Boolean getQuitFlag() {
+        return quitFlag;
+    }
+
+    public void setQuitFlag(boolean quitFlag) {
+        this.quitFlag = quitFlag;
+    }
+
+    public void setConnected(Boolean connected) {
+        this.connected = connected;
+    }
 }

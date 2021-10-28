@@ -46,8 +46,6 @@ public class ServerThread extends Thread {
                 Socket socket = serverSocket.accept(); //a new connection request
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)); // set encoding as UTF8
                 BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-                String str = br.readLine();
-                System.out.println(str);
                 User user = new User(socket.getRemoteSocketAddress() + "", null, bw);
                 ServerConnThread serverConnThread = new ServerConnThread(socket, br, this, user);
                 serverConnThread.start();
@@ -95,8 +93,10 @@ public class ServerThread extends Thread {
                 String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), null != currentRoom ? currentRoom.getRoomId() : null, roomidToJoin));
                 user.sendMsg(msg);
             } else { //房间列表没找到要加入的房间，房间不存在。
-                String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), null != user.getCurrentRoom() ? user.getCurrentRoom().getRoomId() : null, user.getCurrentRoom().getRoomId()));
-                user.sendMsg(msg);
+                if(null != user.getCurrentRoom()){
+                    String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), user.getCurrentRoom().getRoomId(), user.getCurrentRoom().getRoomId()));
+                    user.sendMsg(msg);
+                }
             }
         }
 
@@ -133,14 +133,15 @@ public class ServerThread extends Thread {
         user.sendMsg(msg);
     }
 
-    public void handleQuit(User user) throws JsonProcessingException {
+    public void handleQuit(User user) throws IOException {
         ChatRoom currentRoom = user.getCurrentRoom();
         if (null != currentRoom){
             synchronized (chatRooms) {
                 currentRoom.getMembers().remove(user);
             }
             user.setCurrentRoom(null);
-            mapper.writeValueAsString(new RoomChange(user.getUserId(), currentRoom.getRoomId(), "")); //TODO: DOing
+            String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), currentRoom.getRoomId(), ""));
+            user.sendMsg(msg);
         }
         else{
             System.err.println("HANDLE QUIT: No room to quit from.");
