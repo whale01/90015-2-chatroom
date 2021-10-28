@@ -167,7 +167,6 @@ public class Peer {
             System.out.println(mapper.writeValueAsString(hostChange));
             bw.write(mapper.writeValueAsString(hostChange) + System.lineSeparator());
             bw.flush();
-            new ClientConnThread(socket, br, this).start();
             clientConnThread = new ClientConnThread(socket, br, this);
             clientConnThread.start();
             connected = true;
@@ -394,5 +393,9 @@ public class Peer {
 
     public void setConnected(Boolean connected) {
         this.connected = connected;
+    }
+
+    public void setSocket(Socket socket) {
+        this.socket = socket;
     }
 }

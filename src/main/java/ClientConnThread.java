@@ -8,6 +8,7 @@ import protocal.s2c.RoomList;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 
 /**
  * 监听server的response，并根据response生成相关protocol类，
@@ -32,9 +33,11 @@ public class ClientConnThread extends Thread{
     public void run() {
         System.out.println("A client conn thread started");
         String line = null;
-        while (socket.isConnected() && !quitFlag){
+        while (socket != null && socket.isConnected() && !quitFlag){
             try {
                 line = br.readLine();
+            } catch (SocketException e){
+                System.err.println("Server disconnected.");
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -88,6 +91,7 @@ public class ClientConnThread extends Thread{
             System.out.println("Scenario 3: #quit to leave current room and disconnect");
             socket.close();
             socket = null;
+            peer.setSocket(null);
             quitFlag = true;
 //            peer.setQuitFlag(true);
             peer.setConnected(false);

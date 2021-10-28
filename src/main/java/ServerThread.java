@@ -57,7 +57,6 @@ public class ServerThread extends Thread {
         System.out.printf("%s has connected.\n", host);
     }
 
-
     public void handleJoin(Join join, User user) throws IOException {
         String roomidToJoin = join.getRoomid();
         if (roomidToJoin.equals("")) { //直接#join没有参数的情况，是要退出房间但保持连接。
@@ -67,7 +66,7 @@ public class ServerThread extends Thread {
                     roomToLeave.getMembers().remove(user);
                     user.setCurrentRoom(null);
                     System.out.println("HANDLE JOIN: leaved room " + roomToLeave.getRoomId());//todo
-                    String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), user.getCurrentRoom().getRoomId(), ""));
+                    String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), null != user.getCurrentRoom() ? user.getCurrentRoom().getRoomId() : "" ,""));
                     user.sendMsg(msg);
                 } else {
                     System.err.println("HANDLE JOIN: failed to leave current room");
@@ -137,13 +136,15 @@ public class ServerThread extends Thread {
                 currentRoom.getMembers().remove(user);
             }
             user.setCurrentRoom(null);
+            users.remove(user);
             String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), currentRoom.getRoomId(), ""));
             user.sendMsg(msg);
         }
         else{
-            System.err.println("HANDLE QUIT: No room to quit from.");
+            users.remove(user);
+            String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), "", ""));
+            user.sendMsg(msg);
         }
-
     }
 
     public void handleListNeighbour(User currUser) throws IOException {

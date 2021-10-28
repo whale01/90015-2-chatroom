@@ -37,7 +37,6 @@ public class ServerConnThread extends Thread {
             try {
                 line = br.readLine();
                 if(line != null){
-                    System.out.println(line);
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     switch (type){
@@ -61,6 +60,7 @@ public class ServerConnThread extends Thread {
                             System.out.println(line);
                             serverThread.handleQuit(user);
                             quitFlag = true;
+                            System.out.println("A server conn thread ended.");
                             break;
                         case ("message"):
                             //TODO
