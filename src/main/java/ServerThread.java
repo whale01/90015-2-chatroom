@@ -58,11 +58,23 @@ public class ServerThread extends Thread {
         System.out.printf("%s has connected.\n", host);
     }
 
-    public void handleMsg(MessageC2S messageC2S, User user) {
+    public void handleMsg(MessageC2S messageC2S, User user) throws IOException {
         String msgContent = messageC2S.getContent();
         ChatRoom currentRoom = user.getCurrentRoom();
-        assert currentRoom != null;
-        new MessageS2C();
+        if(currentRoom == null){
+            return;
+        }
+        assert msgContent != null;
+        assert user.getUserId() != null;
+        String msg = mapper.writeValueAsString(new MessageS2C(user.getUserId(), msgContent));
+        List<User> members = currentRoom.getMembers();
+        for (User member : members) {
+            if(member.getBw() == null){
+                System.out.println(msg);
+                continue;
+            }
+            member.sendMsg(msg);
+        }
 
     }
 

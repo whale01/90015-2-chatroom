@@ -14,12 +14,13 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class Peer {
-    @Option(name = "-p", usage = "The listening (server) port - waiting for incoming connections ")
+    @Option(name = "-p")
     private int pPort = 4444;
 
-    @Option(name = "-i", usage = "The speaking (client) port - ready to make outgoing connections")
+    @Option(name = "-i")
     private int iPort = Integer.MIN_VALUE;
 
     private Socket socket;
@@ -28,7 +29,7 @@ public class Peer {
     private final Map<String, ChatRoom> chatRooms = Collections.synchronizedMap(new HashMap<>());
     private User self;
 
-    private Boolean connected = false;
+    private static Boolean connected = false;
     private Boolean quitFlag = false;
 
     private ClientConnThread clientConnThread;
@@ -45,7 +46,8 @@ public class Peer {
         try {
             peer.act();
         } catch (SocketException e) {
-            System.out.println("Cannot reach server.");;
+            System.out.println("Cannot reach server.");
+            connected = false;
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -57,11 +59,26 @@ public class Peer {
         CmdLineParser parser = new CmdLineParser(this);
         try {
             parser.parseArgument(args);
+            // check format of ports
+            if(isValidPort(pPort)){
+                if(iPort != Integer.MIN_VALUE){ //iPort specified
+                    if(isValidPort(iPort)){
+                        // do nothing
+                    } else {
+                        throw new CmdLineException(parser,"Port format invalid");
+                    }
+                } else { //iPort not specified
+                    // do nothing
+                }
+            }else{ //pPort invalid
+                throw new CmdLineException(parser,"Port format invalid");
+            }
         } catch (CmdLineException e) {
             System.err.println(e.getMessage());
             System.err.println("Use it like this: java -jar chatpeer.jar [-p port] [-i port]");
             parser.printUsage(System.err);
             System.err.println();
+            System.exit(1);
         }
     }
 
@@ -72,7 +89,7 @@ public class Peer {
         Scanner sc = new Scanner(System.in);
         while (sc.hasNext()) {
             String line = sc.nextLine();
-            if (line.startsWith("#")) {
+            if (line.startsWith("#")) { // command
                 String[] splitLine = line.strip().split(" ");
                 String command = splitLine[0].substring(1); // get the actual command
                 switch (command) {
@@ -80,9 +97,17 @@ public class Peer {
                         connect(splitLine);
                         break;
                     case Commands.CREATEROOM:
+                        if(connected){
+                            System.err.println("CREATEROOM: Invalid when connected");
+                            break;
+                        }
                         createRoom(splitLine);
                         break;
                     case Commands.KICK:
+                        if(connected){
+                            System.err.println("KICK: Invalid when connected");
+                            break;
+                        }
                         kick(splitLine);
                         break;
                     case Commands.HELP:
@@ -101,6 +126,13 @@ public class Peer {
                         }else{
                             whoLocal(splitLine);
                         }
+                        break;
+                    case Commands.DELETE:
+                        if(connected){
+                            System.err.println("DELETE: Invalid when connected");
+                            break;
+                        }
+                        delete(splitLine);
                         break;
                     case Commands.LIST:
                         if(connected){
@@ -151,9 +183,17 @@ public class Peer {
         }
         if (splitLine.length == 2 || splitLine.length == 3) {
             String[] splitArg = splitLine[1].split(":");
+            if(splitArg.length != 2){
+                System.err.println("CONNECT: Format wrong - address:listenport sourceport");
+                return;
+            }
             String remoteAddress = splitArg[0];
             String remotePort = splitArg[1];
-            //TODO: 验证address:port格式正确性
+            //验证address:port格式正确性
+            if(!(isValidIP(remoteAddress) && isValidPort(Integer.parseInt(remotePort)))){
+                System.err.println("CONNECT: Format wrong - address:listenport sourceport");
+                return;
+            }
             switch (splitLine.length) {
                 case (2):
                     if (iPort == Integer.MIN_VALUE) {
@@ -163,7 +203,10 @@ public class Peer {
                     }
                     break;
                 case (3):
-                    //TODO: 验证localPort格式正确性
+                    if(!(isValidPort(iPort))){
+                        System.out.println("CONNECT: Format wrong - address:listenport sourceport");
+                        return;
+                    }
                     iPort = Integer.parseInt(splitLine[2]);
                     socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
                     break;
@@ -183,7 +226,6 @@ public class Peer {
         }
     }
 
-
     private void msgLocal(String line) throws IOException {
         ChatRoom currentRoom = self.getCurrentRoom();
         if(null == currentRoom){
@@ -202,8 +244,13 @@ public class Peer {
         }
     }
 
-    private void msgRemote(String line) {
-
+    /**
+     * Send msg as a connected client.
+     */
+    private void msgRemote(String line) throws IOException {
+        String msg = mapper.writeValueAsString(new MessageC2S(line));
+        bw.write(msg + System.lineSeparator());
+        bw.flush();
     }
 
     /**
@@ -214,22 +261,40 @@ public class Peer {
      * 2. 创建。
      */
     private void createRoom(String[] splitLine) {
-        if(connected){
-            // do nothing
-        }else{
-            if (splitLine.length == 2) {
-                String roomToCreate = splitLine[1];
-                //TODO: 验证roomToCreate格式
-                if (!chatRooms.containsKey(roomToCreate)) {
-                    ChatRoom chatRoom = new ChatRoom(roomToCreate);
-                    chatRooms.put(roomToCreate, chatRoom);
-                    System.out.println("CREATE ROOM: Room " + roomToCreate + " created.");
-                } else {
-                    System.err.println("CREATEROOM: Name occupied.");
-                }
+        if (splitLine.length == 2) {
+            String roomToCreate = splitLine[1];
+            //TODO: 验证roomToCreate格式
+            if (!chatRooms.containsKey(roomToCreate)) {
+                ChatRoom chatRoom = new ChatRoom(roomToCreate);
+                chatRooms.put(roomToCreate, chatRoom);
+                System.out.println("CREATE ROOM: Room " + roomToCreate + " created.");
             } else {
-                System.err.println("CREATEROOM: Wrong number of args");
+                System.err.println("CREATEROOM: Name occupied.");
             }
+        } else {
+            System.err.println("CREATEROOM: Wrong number of args");
+        }
+    }
+
+    /**
+     * local local command
+     */
+    private void delete(String[] splitLine) {
+        if(splitLine.length == 2){
+            String roomToDelete = splitLine[1];
+            if(chatRooms.containsKey(roomToDelete)){
+                ChatRoom roomToD = chatRooms.get(roomToDelete);
+                java.util.List<User> members = roomToD.getMembers();
+                for (User member : members) {
+                    member.setCurrentRoom(null);
+                }
+                chatRooms.remove(roomToDelete);
+                System.out.println("DELETE: Room " + roomToDelete + " deleted.");
+            } else {
+                System.err.println("DELETE: No such room to delete");
+            }
+        } else {
+            System.err.println("DELETE: Wrong number of args");
         }
     }
 
@@ -237,22 +302,34 @@ public class Peer {
      * local local command
      */
     private void kick(String[] splitLine) {
-        if(connected){
-            // do nothing
-        }else{
 
-        }
     }
 
     /**
      * local local command
+     * sprint help guide, with some different colors of course.
+     * ( cannot show on windows terminal )
      */
     private void help(String[] splitLine) {
-        if(connected){
-            // do nothing
-        }else{
-
-        }
+        String help =
+                    "GENERAL COMMANDS: " + System.lineSeparator() +
+                            Commands.ANSI_BLUE +
+                    "#help - list this info" + System.lineSeparator() +
+                    "#connect IP[:remote listening port] [local source port] - connect to another peer" + System.lineSeparator() +
+                    "#quit - disconnect if connected to a peer" + System.lineSeparator() +
+                    "#join [roomid] - join a room, or leave the current room but stay connected if no roomid provided" + System.lineSeparator() +
+                    "#who roomid - see who's in a room" + System.lineSeparator() +
+                    "#list - see the current server's list of rooms and head count in each room" + System.lineSeparator() +
+                    "#listneighbors - see a list of neighbor peers" + System.lineSeparator() +
+                    "#searchnetwork - see a list of rooms and info for each room on the network" + System.lineSeparator() +
+                            Commands.ANSI_RESET +
+                    "LOCAL ONLY COMMANDS: " + System.lineSeparator() +
+                            Commands.ANSI_BLUE +
+                    "#createroom roomid - create a room with a name locally" + System.lineSeparator() +
+                    "#delete roomid - delete a room and send members back to the void" + System.lineSeparator() +
+                    "#kick id - kick a user and block the user's ip from reconnecting" +
+                            Commands.ANSI_RESET;
+        System.out.println(help);
     }
 
     /**
@@ -448,5 +525,17 @@ public class Peer {
 
     public void setSocket(Socket socket) {
         this.socket = socket;
+    }
+
+    private static boolean isValidIP(String str) {
+        if (str.equals("localhost")) {
+            return true;
+        }
+        return Pattern.matches("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$", str);
+    }
+
+    private static boolean isValidPort(int port) {
+        return Pattern.matches("^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+                , String.valueOf(port));
     }
 }
