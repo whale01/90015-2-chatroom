@@ -26,4 +26,12 @@ public class Commands {
      * It will always start out locally (not on remote connection), then branch out
      */
     public static final String SEARCHNETWORK = "searchnetwork";
+
+
+    /**
+     * Escapes (转义符) to set the sout color
+     */
+    public static final String ANSI_BLUE = "\u001B[34m";
+    public static final String ANSI_RESET = "\u001B[0m";
+
 }

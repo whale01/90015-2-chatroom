@@ -64,7 +64,7 @@ public class ServerConnThread extends Thread {
                             break;
                         case ("message"):
                             MessageC2S messageC2S = mapper.readValue(line, MessageC2S.class);
-                            System.out.println(line);
+//                            System.out.println(line);
                             serverThread.handleMsg(messageC2S,user);
                             break;
                         case ("hostchange"):
