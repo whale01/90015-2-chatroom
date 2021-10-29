@@ -1,15 +1,14 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import protocal.c2s.HostChange;
-import protocal.s2c.MessageS2C;
-import protocal.s2c.RoomChange;
-import protocal.s2c.RoomContents;
-import protocal.s2c.RoomList;
+import protocal.c2s.ListNeighbours;
+import protocal.s2c.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.List;
 
 /**
  * 监听server的response，并根据response生成相关protocol类，
@@ -44,6 +43,7 @@ public class ClientConnThread extends Thread{
             }
             if(null != line){
                 try {
+                    System.out.println(line);
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     switch (type){
@@ -55,9 +55,12 @@ public class ClientConnThread extends Thread{
                             RoomContents roomContents = mapper.readValue(line, RoomContents.class);
                             System.out.println(mapper.writeValueAsString(roomContents));;
                             break;
-                        case ("hostchange"):
-                            //TODO
-                            HostChange hostChange = mapper.readValue(line, HostChange.class);
+                        case ("neighbors"):
+                            Neighbors neighbors = mapper.readValue(line, Neighbors.class);
+                            List<String> ids = neighbors.getNeighbors();
+                            for (String id: ids) {
+                                System.out.println(id);
+                            }
                             break;
                         case ("roomlist"):
                             RoomList roomList = mapper.readValue(line, RoomList.class);

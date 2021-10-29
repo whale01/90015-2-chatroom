@@ -172,7 +172,6 @@ public class Peer {
             br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
             String localIP = InetAddress.getLocalHost().toString().split("/")[1];
             HostChange hostChange = new HostChange(localIP + ":" + pPort);
-            System.out.println(mapper.writeValueAsString(hostChange));
             bw.write(mapper.writeValueAsString(hostChange) + System.lineSeparator());
             bw.flush();
             clientConnThread = new ClientConnThread(socket, br, this);
@@ -424,7 +423,6 @@ public class Peer {
     private void listNeighbour() {
         try {
             ListNeighbours listNeighbours = new ListNeighbours();
-            System.out.println(mapper.writeValueAsString(listNeighbours));
             bw.write(mapper.writeValueAsString(listNeighbours) + System.lineSeparator());
             bw.flush();
         } catch (IOException e) {

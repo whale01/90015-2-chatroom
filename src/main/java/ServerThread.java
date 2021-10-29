@@ -157,14 +157,12 @@ public class ServerThread extends Thread {
     }
 
     public void handleListNeighbour(User currUser) throws IOException {
-        System.out.println("Handle list neighbors");
         ArrayList<String> identities = new ArrayList<>();
         for (User user: users) {
             if (!user.getUserId().equals(currUser.getUserId())) {
                 identities.add(user.getUserId());
             }
         }
-        System.out.println(identities);
         String msg = mapper.writeValueAsString(new Neighbors(identities));
         currUser.sendMsg(msg);
     }
