@@ -26,6 +26,7 @@ public class Peer {
     private BufferedReader br;
     private BufferedWriter bw;
     private final Map<String, ChatRoom> chatRooms = Collections.synchronizedMap(new HashMap<>());
+    public Set<Address> knownAddresses = new HashSet<>();
     private User self;
 
     private Boolean connected = false;
@@ -122,6 +123,10 @@ public class Peer {
                         }
                         break;
                     case Commands.SEARCHNETWORK:
+//                        if (!connected) {
+//                            searchNetwork();
+//                        }
+                        searchNetwork();
                         break;
                     default:
                         System.out.println("INVALID COMMAND!");
@@ -152,20 +157,20 @@ public class Peer {
         if (splitLine.length == 2 || splitLine.length == 3) {
             String[] splitArg = splitLine[1].split(":");
             String remoteAddress = splitArg[0];
-            String remotePort = splitArg[1];
+            int remotePort = Integer.parseInt(splitArg[1]);
             //TODO: 验证address:port格式正确性
             switch (splitLine.length) {
                 case (2):
                     if (iPort == Integer.MIN_VALUE) {
-                        socket = new Socket(remoteAddress, Integer.parseInt(remotePort));
+                        socket = new Socket(remoteAddress, remotePort);
                     } else {
-                        socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
+                        socket = new Socket(remoteAddress, remotePort, InetAddress.getLocalHost(), iPort);
                     }
                     break;
                 case (3):
                     //TODO: 验证localPort格式正确性
                     iPort = Integer.parseInt(splitLine[2]);
-                    socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
+                    socket = new Socket(remoteAddress, remotePort, InetAddress.getLocalHost(), iPort);
                     break;
             }
             bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
@@ -176,6 +181,7 @@ public class Peer {
             bw.flush();
             clientConnThread = new ClientConnThread(socket, br, this);
             clientConnThread.start();
+            knownAddresses.add(new Address(remoteAddress, remotePort));
             connected = true;
         } else {
             System.err.println("CONNECT: Wrong number of args");
@@ -427,6 +433,48 @@ public class Peer {
             bw.flush();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Search the network with listneighbors and list
+     */
+    public void searchNetwork() throws IOException {
+        // use known addresses (peers that we have connected) as a starting point
+        Stack<Address> toSearch = new Stack<>();
+        toSearch.addAll(knownAddresses);
+        ArrayList<Address> visited = new ArrayList<>();
+        visited.add(new Address(self.getUserId()));
+        while (toSearch.size() > 0) {
+            // connect to the address using a different socket
+            Address currentAddress = toSearch.pop();
+            Socket lsocket = new Socket(currentAddress.getIP(), currentAddress.getPort());
+            BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
+            BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
+            // use list to find out its rooms
+            List list = new List();
+            lbw.write(mapper.writeValueAsString(list) + System.lineSeparator());
+            lbw.flush();
+            // read the response
+            String roomList = lbr.readLine();
+            System.out.println(currentAddress.toString());
+            RoomList rooms = mapper.readValue(roomList, RoomList.class);
+            for (Room room: rooms.getRooms()) {
+                System.out.println(room.getRoomid() + ": " + room.getCount());
+            }
+            // use list_neighbors to find out the neighbors
+            ListNeighbours listNeighbours = new ListNeighbours();
+            lbw.write(mapper.writeValueAsString(listNeighbours) + System.lineSeparator());
+            lbw.flush();
+            String neighborList = lbr.readLine();
+            Neighbors neighbors = mapper.readValue(neighborList, Neighbors.class);
+            java.util.List<String> ids = neighbors.getNeighbors();
+            for (String id: ids) {
+                if (!visited.contains(id)) {
+                    toSearch.add(new Address(id));
+                }
+            }
+            visited.add(currentAddress);
         }
     }
 
