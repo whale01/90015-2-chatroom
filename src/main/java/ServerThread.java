@@ -179,5 +179,9 @@ public class ServerThread extends Thread {
         currUser.sendMsg(msg);
     }
 
+    public ArrayList<User> getUsers() {
+        return users;
+    }
+
 
 }

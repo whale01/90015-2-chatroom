@@ -23,11 +23,13 @@ public class Peer {
     @Option(name = "-i")
     private int iPort = Integer.MIN_VALUE;
 
+
+    private ServerThread server;
     private Socket socket;
     private BufferedReader br;
     private BufferedWriter bw;
     private final Map<String, ChatRoom> chatRooms = Collections.synchronizedMap(new HashMap<>());
-    public Set<Address> knownAddresses = new HashSet<>();
+//    public Set<Address> knownAddresses = new HashSet<>();
     private User self;
 
     private static Boolean connected = false;
@@ -85,7 +87,7 @@ public class Peer {
 
     private void act() throws IOException, InterruptedException, SocketException {
         self = new User("localhost:"+pPort,null,null);
-        ServerThread server = new ServerThread(pPort, chatRooms);
+        server = new ServerThread(pPort, chatRooms);
         server.start();
         Scanner sc = new Scanner(System.in);
         while (sc.hasNext()) {
@@ -220,7 +222,7 @@ public class Peer {
             bw.flush();
             clientConnThread = new ClientConnThread(socket, br, this);
             clientConnThread.start();
-            knownAddresses.add(new Address(remoteAddress, remotePort));
+//            knownAddresses.add(new Address(remoteAddress, remotePort));
             connected = true;
         } else {
             System.err.println("CONNECT: Wrong number of args");
@@ -513,9 +515,24 @@ public class Peer {
      * Search the network with listneighbors and list
      */
     public void searchNetwork() throws IOException {
-        // use known addresses (peers that we have connected) as a starting point
         Stack<Address> toSearch = new Stack<>();
-        toSearch.addAll(knownAddresses);
+        // if connecting as client, start with the server
+        if (connected) {
+            InetAddress IP = socket.getInetAddress();
+            String IPString;
+            // get rid of localhost
+            if (IP.toString().contains("localhost")) {
+                 IPString = IP.toString().split("/")[1];
+            } else {
+                IPString = IP.toString();
+            }
+            toSearch.add(new Address(IPString, socket.getPort()));
+        } else {
+            // start with the connections I have
+            for (User user : server.getUsers()) {
+                toSearch.add(new Address(user.getUserId()));
+            }
+        }
         ArrayList<Address> visited = new ArrayList<>();
         visited.add(new Address(self.getUserId()));
         while (toSearch.size() > 0) {
@@ -524,17 +541,7 @@ public class Peer {
             Socket lsocket = new Socket(currentAddress.getIP(), currentAddress.getPort());
             BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
             BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
-            // use list to find out its rooms
-            List list = new List();
-            lbw.write(mapper.writeValueAsString(list) + System.lineSeparator());
-            lbw.flush();
-            // read the response
-            String roomList = lbr.readLine();
-            System.out.println(currentAddress.toString());
-            RoomList rooms = mapper.readValue(roomList, RoomList.class);
-            for (Room room: rooms.getRooms()) {
-                System.out.println(room.getRoomid() + ": " + room.getCount());
-            }
+
             // use list_neighbors to find out the neighbors
             ListNeighbours listNeighbours = new ListNeighbours();
             lbw.write(mapper.writeValueAsString(listNeighbours) + System.lineSeparator());
@@ -548,6 +555,26 @@ public class Peer {
                 }
             }
             visited.add(currentAddress);
+
+            // use list to find out its rooms
+            List list = new List();
+            lbw.write(mapper.writeValueAsString(list) + System.lineSeparator());
+            lbw.flush();
+            // read the response
+            String roomList = lbr.readLine();
+            System.out.println(currentAddress.toString());
+            RoomList rooms = mapper.readValue(roomList, RoomList.class);
+            for (Room room: rooms.getRooms()) {
+                System.out.println(room.getRoomid() + ": " + room.getCount());
+            }
+
+            // user sends a quit packet
+            Quit quit = new Quit();
+            lbw.write(mapper.writeValueAsString(quit) + System.lineSeparator());
+            lbw.flush();
+            // consumer the roomchange message and close the connection
+            lbr.readLine();
+            lsocket.close();
         }
     }
 
