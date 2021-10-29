@@ -1,6 +1,7 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import protocal.c2s.HostChange;
+import protocal.s2c.MessageS2C;
 import protocal.s2c.RoomChange;
 import protocal.s2c.RoomContents;
 import protocal.s2c.RoomList;
@@ -61,6 +62,10 @@ public class ClientConnThread extends Thread{
                         case ("roomlist"):
                             RoomList roomList = mapper.readValue(line, RoomList.class);
                             System.out.println(mapper.writeValueAsString(roomList));
+                            break;
+                        case("message"):
+                            MessageS2C messageS2C = mapper.readValue(line, MessageS2C.class);
+                            System.out.println(mapper.writeValueAsString(messageS2C));
                             break;
                     }
                 } catch (IOException | InterruptedException e) {

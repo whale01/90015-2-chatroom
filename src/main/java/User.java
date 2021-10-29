@@ -41,6 +41,10 @@ public class User {
         this.ownRooms = ownRooms;
     }
 
+    public BufferedWriter getBw() {
+        return bw;
+    }
+
     /**
      * 任何需要和client发任何消息的场景都用到这个方法。
      */

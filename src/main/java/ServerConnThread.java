@@ -63,14 +63,18 @@ public class ServerConnThread extends Thread {
                             System.out.println("A server conn thread ended.");
                             break;
                         case ("message"):
-                            //TODO
+                            MessageC2S messageC2S = mapper.readValue(line, MessageC2S.class);
+                            System.out.println(line);
+                            serverThread.handleMsg(messageC2S,user);
                             break;
                         case ("hostchange"):
                             HostChange hostChange = mapper.readValue(line, HostChange.class);
+                            System.out.println(line);
                             serverThread.handleHostChange(hostChange,user);
                             break;
                         case ("listneighbors"):
                             serverThread.handleListNeighbour(user);
+                            System.out.println(line);
                             break;
                     }
                 } else {

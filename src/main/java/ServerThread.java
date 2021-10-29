@@ -2,6 +2,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import protocal.c2s.HostChange;
 import protocal.c2s.Join;
+import protocal.c2s.MessageC2S;
 import protocal.c2s.Who;
 import protocal.s2c.*;
 
@@ -55,6 +56,14 @@ public class ServerThread extends Thread {
         String host = hostChange.getHost();
         user.setUserId(host);
         System.out.printf("%s has connected.\n", host);
+    }
+
+    public void handleMsg(MessageC2S messageC2S, User user) {
+        String msgContent = messageC2S.getContent();
+        ChatRoom currentRoom = user.getCurrentRoom();
+        assert currentRoom != null;
+        new MessageS2C();
+
     }
 
     public void handleJoin(Join join, User user) throws IOException {
@@ -159,4 +168,6 @@ public class ServerThread extends Thread {
         String msg = mapper.writeValueAsString(new Neighbors(identities));
         currUser.sendMsg(msg);
     }
+
+
 }

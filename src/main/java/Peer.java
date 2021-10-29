@@ -6,14 +6,12 @@ import org.kohsuke.args4j.Option;
 import protocal.Commands;
 import protocal.c2s.*;
 import protocal.c2s.List;
-import protocal.s2c.Room;
-import protocal.s2c.RoomChange;
-import protocal.s2c.RoomContents;
-import protocal.s2c.RoomList;
+import protocal.s2c.*;
 
 import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -46,6 +44,8 @@ public class Peer {
         peer.parseArgs(args);
         try {
             peer.act();
+        } catch (SocketException e) {
+            System.out.println("Cannot reach server.");;
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -65,8 +65,8 @@ public class Peer {
         }
     }
 
-    private void act() throws IOException, InterruptedException {
-        self = new User("localhost:"+pPort,null,bw); //不会给自己发消息，bw设为Null
+    private void act() throws IOException, InterruptedException, SocketException {
+        self = new User("localhost:"+pPort,null,null);
         ServerThread server = new ServerThread(pPort, chatRooms);
         server.start();
         Scanner sc = new Scanner(System.in);
@@ -127,6 +127,14 @@ public class Peer {
                         System.out.println("INVALID COMMAND!");
                 }
             }
+            else{ //msg
+                if(connected){
+                    msgRemote(line);
+                }
+                else{
+                    msgLocal(line);
+                }
+            }
             System.out.print(">");
         }
 
@@ -175,34 +183,76 @@ public class Peer {
         }
     }
 
+
+    private void msgLocal(String line) throws IOException {
+        ChatRoom currentRoom = self.getCurrentRoom();
+        if(null == currentRoom){
+            //do nothing
+        }
+        else{
+            java.util.List<User> members = currentRoom.getMembers();
+            String msg = mapper.writeValueAsString(new MessageS2C(self.getUserId(), line));
+            for (User member : members) {
+                if(member.getBw() == null){
+                    continue;
+                }
+                member.sendMsg(msg);
+            }
+            System.out.println(msg); //self msging
+        }
+    }
+
+    private void msgRemote(String line) {
+
+    }
+
     /**
+     * local local command
      * 本地命令。
      * 在本地创建房间。
      * 1. 检查是否有重复房间
      * 2. 创建。
      */
     private void createRoom(String[] splitLine) {
-        if (splitLine.length == 2) {
-            String roomToCreate = splitLine[1];
-            //TODO: 验证roomToCreate格式
-            if (!chatRooms.containsKey(roomToCreate)) {
-                ChatRoom chatRoom = new ChatRoom(roomToCreate);
-                chatRooms.put(roomToCreate, chatRoom);
-                System.out.println("CREATE ROOM: Room " + roomToCreate + " created.");
+        if(connected){
+            // do nothing
+        }else{
+            if (splitLine.length == 2) {
+                String roomToCreate = splitLine[1];
+                //TODO: 验证roomToCreate格式
+                if (!chatRooms.containsKey(roomToCreate)) {
+                    ChatRoom chatRoom = new ChatRoom(roomToCreate);
+                    chatRooms.put(roomToCreate, chatRoom);
+                    System.out.println("CREATE ROOM: Room " + roomToCreate + " created.");
+                } else {
+                    System.err.println("CREATEROOM: Name occupied.");
+                }
             } else {
-                System.err.println("CREATEROOM: Name occupied.");
+                System.err.println("CREATEROOM: Wrong number of args");
             }
-        } else {
-            System.err.println("CREATEROOM: Wrong number of args");
         }
     }
 
+    /**
+     * local local command
+     */
     private void kick(String[] splitLine) {
+        if(connected){
+            // do nothing
+        }else{
 
+        }
     }
 
+    /**
+     * local local command
+     */
     private void help(String[] splitLine) {
+        if(connected){
+            // do nothing
+        }else{
 
+        }
     }
 
     /**
@@ -381,6 +431,7 @@ public class Peer {
             e.printStackTrace();
         }
     }
+
 
 
     public Boolean getQuitFlag() {
