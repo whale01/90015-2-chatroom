@@ -42,10 +42,16 @@ public class ServerThread extends Thread {
                 Socket socket = serverSocket.accept(); //a new connection request
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)); // set encoding as UTF8
                 BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-                User user = new User(socket.getRemoteSocketAddress() + "", null, bw);
+                System.out.println(socket.getPort());
+                System.out.println(socket.getInetAddress());
+                System.out.println(socket.getLocalPort());
+                System.out.println(socket.getLocalAddress());
+                User user = new User(null,null, null, bw); //TODO
                 users.add(user);
                 ServerConnThread serverConnThread = new ServerConnThread(socket, br, this, user);
                 serverConnThread.start();
+                user.setServerConnThread(serverConnThread);
+
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -181,5 +187,7 @@ public class ServerThread extends Thread {
         currUser.sendMsg(msg);
     }
 
-
+    public ArrayList<User> getUsers() {
+        return users;
+    }
 }

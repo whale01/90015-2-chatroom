@@ -5,15 +5,18 @@ import java.util.Collections;
 import java.util.List;
 
 public class User {
-    private String userId;
-    private ChatRoom currentRoom;
-    private List<ChatRoom> ownRooms;
-    private final BufferedWriter bw;
+    private String userId; // address:source port, userd for unique identifier, and chatting prefix
+    private String ipAndListeningPort; // address:listening port, used when #listneighbors & #searchnetwork
 
-    public User(String userId, ChatRoom currentRoom, BufferedWriter bw) {
+    private ChatRoom currentRoom;
+    private final BufferedWriter bw;
+    private ServerConnThread serverConnThread;
+
+
+    public User(String userId, String ipAndListeningPort, ChatRoom currentRoom,  BufferedWriter bw) {
         this.userId = userId;
+        this.ipAndListeningPort = ipAndListeningPort;
         this.currentRoom = currentRoom;
-        this.ownRooms = Collections.synchronizedList(new ArrayList<ChatRoom>());
         this.bw = bw;
     }
 
@@ -33,16 +36,16 @@ public class User {
         this.currentRoom = currentRoom;
     }
 
-    public List<ChatRoom> getOwnRooms() {
-        return ownRooms;
-    }
-
-    public void setOwnRooms(List<ChatRoom> ownRooms) {
-        this.ownRooms = ownRooms;
-    }
-
     public BufferedWriter getBw() {
         return bw;
+    }
+
+    public ServerConnThread getServerConnThread() {
+        return serverConnThread;
+    }
+
+    public void setServerConnThread(ServerConnThread serverConnThread) {
+        this.serverConnThread = serverConnThread;
     }
 
     /**
@@ -53,12 +56,4 @@ public class User {
         bw.flush();
     }
 
-    @Override
-    public String toString() {
-        return "User{" +
-                "userId='" + userId + '\'' +
-                ", currentRoom=" + currentRoom +
-                ", ownRooms=" + ownRooms +
-                '}';
-    }
 }

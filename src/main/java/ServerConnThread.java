@@ -86,4 +86,8 @@ public class ServerConnThread extends Thread {
             }
         }
     }
+
+    public void setQuitFlag(Boolean quitFlag) {
+        this.quitFlag = quitFlag;
+    }
 }

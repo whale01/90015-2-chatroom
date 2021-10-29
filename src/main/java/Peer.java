@@ -33,6 +33,7 @@ public class Peer {
     private Boolean quitFlag = false;
 
     private ClientConnThread clientConnThread;
+    private ServerThread server;
 
     private ObjectMapper mapper = new ObjectMapper();
 
@@ -83,8 +84,8 @@ public class Peer {
     }
 
     private void act() throws IOException, InterruptedException, SocketException {
-        self = new User("localhost:"+pPort,null,null);
-        ServerThread server = new ServerThread(pPort, chatRooms);
+        self = new User("localhost:"+pPort,"localhost:"+iPort,null,null);
+        server = new ServerThread(pPort, chatRooms);
         server.start();
         Scanner sc = new Scanner(System.in);
         while (sc.hasNext()) {
@@ -183,31 +184,33 @@ public class Peer {
         }
         if (splitLine.length == 2 || splitLine.length == 3) {
             String[] splitArg = splitLine[1].split(":");
-            if(splitArg.length != 2){
+            if(splitArg.length != 2){ // ensure the first arg is have both address and port
                 System.err.println("CONNECT: Format wrong - address:listenport sourceport");
                 return;
             }
             String remoteAddress = splitArg[0];
             String remotePort = splitArg[1];
-            //验证address:port格式正确性
-            if(!(isValidIP(remoteAddress) && isValidPort(Integer.parseInt(remotePort)))){
-                System.err.println("CONNECT: Format wrong - address:listenport sourceport");
-                return;
-            }
             switch (splitLine.length) {
                 case (2):
-                    if (iPort == Integer.MIN_VALUE) {
+                    // Validate the format
+                    if(!(isValidIP(remoteAddress) && isValidPort(Integer.parseInt(remotePort)))){
+                        System.err.println("CONNECT: Format wrong - address:listenport sourceport");
+                        return;
+                    }
+                    if (iPort == Integer.MIN_VALUE) { // No outgoing port is set when initialization, use random
                         socket = new Socket(remoteAddress, Integer.parseInt(remotePort));
-                    } else {
+                    } else { // Outgoing set already, use the set outgoing port
                         socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
                     }
                     break;
                 case (3):
-                    if(!(isValidPort(iPort))){
+                    String outgoingPort = splitLine[2];
+                    // Validate the format
+                    if(!(isValidPort(Integer.parseInt(outgoingPort)) && isValidIP(remoteAddress) && isValidPort(Integer.parseInt(remotePort)))){
                         System.out.println("CONNECT: Format wrong - address:listenport sourceport");
                         return;
                     }
-                    iPort = Integer.parseInt(splitLine[2]);
+                    iPort = Integer.parseInt(outgoingPort);
                     socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
                     break;
             }
@@ -221,6 +224,8 @@ public class Peer {
             clientConnThread = new ClientConnThread(socket, br, this);
             clientConnThread.start();
             connected = true;
+            self.setUserId(localIP + ":" + socket.getLocalPort());
+            System.out.println(self.getUserId());//TODO: test
         } else {
             System.err.println("CONNECT: Wrong number of args");
         }
@@ -302,7 +307,21 @@ public class Peer {
      * local local command
      */
     private void kick(String[] splitLine) {
-
+        if(splitLine.length == 2){
+            String userToKick = splitLine[1];
+            ArrayList<User> users = server.getUsers();
+            for (User user : users) {
+                if(user.getUserId().equals(userToKick)){
+                    java.util.List<User> members = user.getCurrentRoom().getMembers();
+                    members.remove(user);
+                    users.remove(user);
+                    user.setCurrentRoom(null);
+                    user.getServerConnThread().setQuitFlag(true); // close the server conn for this user
+                }
+            }
+        } else {
+            System.err.println("KICK: Wrong number of args.");
+        }
     }
 
     /**
