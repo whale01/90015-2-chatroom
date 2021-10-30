@@ -1,4 +1,5 @@
 import java.net.InetAddress;
+import java.util.regex.Pattern;
 
 public class Address {
 
@@ -40,4 +41,21 @@ public class Address {
     public String toString() {
         return this.IP + ":" + this.port;
     }
+
+    public static boolean isValidIP(String IP) {
+        if (IP.equals("localhost")) {
+            return true;
+        }
+        return Pattern.matches("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$", IP);
+    }
+
+    public static boolean isValidPort(int port) {
+        return Pattern.matches("^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+                , String.valueOf(port));
+    }
+
+    public boolean isValidAddress() {
+        return isValidIP(this.IP) && isValidPort(this.port);
+    }
+
 }

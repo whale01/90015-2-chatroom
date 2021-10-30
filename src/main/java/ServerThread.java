@@ -10,9 +10,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ServerThread extends Thread {
     private ObjectMapper mapper = new ObjectMapper();
@@ -21,12 +19,14 @@ public class ServerThread extends Thread {
     private int pPort;
     private ArrayList<User> users;
     private final Map<String, ChatRoom> chatRooms;
+    private Peer peer;
 
     public ObjectMapper getMapper() {
         return mapper;
     }
 
-    public ServerThread(int pPort, Map<String, ChatRoom> chatRooms) {
+    public ServerThread(Peer peer, int pPort, Map<String, ChatRoom> chatRooms) {
+        this.peer = peer;
         this.pPort = pPort;
         this.chatRooms = chatRooms;
         this.users = new ArrayList<>();
@@ -169,18 +169,37 @@ public class ServerThread extends Thread {
     }
 
     public void handleListNeighbour(User currUser) throws IOException {
-        ArrayList<String> identities = new ArrayList<>();
+        Set<String> identities = new HashSet<>();
+        // add the users
         for (User user: users) {
             if (!user.getUserId().equals(currUser.getUserId())) {
                 identities.add(user.getUserId());
             }
         }
-        String msg = mapper.writeValueAsString(new Neighbors(identities));
+        Address connectingAdd = getConnectingAddress();
+        if (connectingAdd != null) {
+            identities.add(connectingAdd.toString());
+        }
+        String msg = mapper.writeValueAsString(new Neighbors(new ArrayList<>(identities)));
         currUser.sendMsg(msg);
     }
 
+    /********************** helper functions **********************/
     public ArrayList<User> getUsers() {
         return users;
+    }
+
+    /*
+     * Get the address of the sever if connecting as client
+     * return null if not connected
+     */
+    public Address getConnectingAddress() {
+         if (peer.getConnected()) {
+             return peer.getConnectingAddress();
+         } else {
+             return null;
+         }
+
     }
 
 
