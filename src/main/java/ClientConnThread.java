@@ -10,6 +10,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.Map;
 
 /**
  * 监听server的response，并根据response生成相关protocol类，
@@ -55,18 +56,17 @@ public class ClientConnThread extends Thread{
                             RoomContents roomContents = mapper.readValue(line, RoomContents.class);
                             System.out.println(mapper.writeValueAsString(roomContents));;
                             break;
-                        case ("hostchange"):
-                            //TODO
-                            HostChange hostChange = mapper.readValue(line, HostChange.class);
-                            break;
                         case ("roomlist"):
                             RoomList roomList = mapper.readValue(line, RoomList.class);
                             System.out.println(mapper.writeValueAsString(roomList));
                             break;
                         case("message"):
                             MessageS2C messageS2C = mapper.readValue(line, MessageS2C.class);
-                            System.out.println(mapper.writeValueAsString(messageS2C));
+                            String id = messageS2C.getIdentity();
+                            String content = messageS2C.getContent();
+                            System.out.println(id + " : " + content);
                             break;
+                        //TODO: case neighbors
                     }
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
@@ -82,30 +82,52 @@ public class ClientConnThread extends Thread{
      * Scenario 3: #quit to leave current room and disconnect
      */
     private void handleRoomChange(RoomChange roomChange) throws IOException, InterruptedException {
+        Map<String, ChatRoom> chatRooms = peer.getChatRooms();
         String roomid = roomChange.getRoomid();
-        assert roomid != null;
+        String former = roomChange.getFormer();
+        String id = roomChange.getIdentity();
+        User self = peer.getSelf();
         Boolean quitRemoteSent = peer.getQuitFlag();
-        if(roomid.equals("") && !quitRemoteSent){
-            //Scenario 2
-            System.out.println(mapper.writeValueAsString(roomChange)); //TODO: 目前client接收到response都打印出来。
-            System.out.println("Scenario 2: #join to leave current room");
-        }
-        else if(roomid.equals("") && quitRemoteSent){
-            //Scenario 3
-            System.out.println(mapper.writeValueAsString(roomChange)); //TODO: 目前client接收到response都打印出来。
-            System.out.println("Scenario 3: #quit to leave current room and disconnect");
+
+        if(quitRemoteSent && roomid.equals("")){ // got response for a quit command
             socket.close();
             socket = null;
             peer.setSocket(null);
             quitFlag = true;
-//            peer.setQuitFlag(true);
             peer.setConnected(false);
+            peer.setQuitFlag(false); // unconnected, but can apparently make new connections.
+            return;
         }
-        else{
-            //Scenario 1
-            System.out.println(mapper.writeValueAsString(roomChange)); //TODO: 目前client接收到response都打印出来。
-            System.out.println("Scenario 1: join a valid room");
 
+        if (id.equals(self.getUserId())){ // this roomchange is regarding me
+            if (roomid.equals(former)){ // failed join (both join to leave & join to join)
+                System.out.println("The requested room is invalid or non existent.");
+            }
+            else{
+                if ( former.equals("")){ // "" -> "roomid"
+                    ChatRoom chatRoom = chatRooms.get(roomid);
+                    assert chatRoom != null;
+                    self.setCurrentRoom(chatRoom);
+                    System.out.println(id + " moved to " + roomid);
+                }
+                else{
+                    if(roomid.equals("")){ // "former" -> ""
+                        self.setCurrentRoom(null);
+                    }
+                    else { // "former" -> "roomid"
+                        ChatRoom chatRoom = chatRooms.get(roomid);
+                        assert chatRoom != null;
+                        self.setCurrentRoom(chatRoom);
+                    }
+                    System.out.println(id + " moved from " + former + " to " + roomid);
+                }
+            }
+        }
+        else { // this roomchange has nothing to do with me
+            System.out.println(
+                    id + " moved from " + (former.equals("") ? "noroom": former)
+                            + " to " + (roomid.equals("") ? "noroom " : roomid)
+            );
         }
     }
 

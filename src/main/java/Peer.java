@@ -14,28 +14,36 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 
 public class Peer {
+
+    /**
+     * pPort & iPort for storing command line args.
+     * pPort is the user-specified listening port of the peer server (by default 4444)
+     * iPort is the user-specified outgoing port of the peer client (by default 0, indicating random when passed to socket)
+     */
     @Option(name = "-p")
     private int pPort = 4444;
 
     @Option(name = "-i")
-    private int iPort = Integer.MIN_VALUE;
+    private int iPort = 0;
 
-    private Socket socket;
+    private static Socket socket;
     private BufferedReader br;
     private BufferedWriter bw;
-    private final Map<String, ChatRoom> chatRooms = Collections.synchronizedMap(new HashMap<>());
+    private final Map<String, ChatRoom> chatRooms = new ConcurrentHashMap<String, ChatRoom>();
+    private final java.util.List<User> users = new CopyOnWriteArrayList<User>();
     private User self;
 
     private static Boolean connected = false;
     private Boolean quitFlag = false;
 
-    private ClientConnThread clientConnThread;
     private ServerThread server;
 
-    private ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     public ObjectMapper getMapper() {
         return mapper;
@@ -46,14 +54,18 @@ public class Peer {
         peer.parseArgs(args);
         try {
             peer.act();
-        } catch (SocketException e) {
-            System.out.println("Cannot reach server.");
-            connected = false;
-        } catch (IOException e) {
+        }  catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+//        finally {
+//            try {
+//                socket.close();
+//            } catch (IOException e) {
+//                System.err.println("main: Failed to close socket");
+//            }
+//        }
     }
 
     private void parseArgs(String[] args) {
@@ -62,7 +74,7 @@ public class Peer {
             parser.parseArgument(args);
             // check format of ports
             if(isValidPort(pPort)){
-                if(iPort != Integer.MIN_VALUE){ //iPort specified
+                if(iPort != 0){ //iPort specified
                     if(isValidPort(iPort)){
                         // do nothing
                     } else {
@@ -84,8 +96,8 @@ public class Peer {
     }
 
     private void act() throws IOException, InterruptedException, SocketException {
-        self = new User("localhost:"+pPort,"localhost:"+iPort,null,null);
-        server = new ServerThread(pPort, chatRooms);
+        self = new User("localhost:"+pPort,null,null); // when unconnected, the user act as the owner of the peer
+        server = new ServerThread(pPort, chatRooms,users);
         server.start();
         Scanner sc = new Scanner(System.in);
         while (sc.hasNext()) {
@@ -160,7 +172,7 @@ public class Peer {
                         System.out.println("INVALID COMMAND!");
                 }
             }
-            else{ //msg
+            else{ //it's a msg, if not a command
                 if(connected){
                     msgRemote(line);
                 }
@@ -182,61 +194,58 @@ public class Peer {
             System.err.println("CONNECT: Already have a TCP connection");
             return;
         }
-        if (splitLine.length == 2 || splitLine.length == 3) {
-            String[] splitArg = splitLine[1].split(":");
-            if(splitArg.length != 2){ // ensure the first arg is have both address and port
-                System.err.println("CONNECT: Format wrong - address:listenport sourceport");
-                return;
-            }
-            String remoteAddress = splitArg[0];
-            String remotePort = splitArg[1];
-            switch (splitLine.length) {
-                case (2):
-                    // Validate the format
-                    if(!(isValidIP(remoteAddress) && isValidPort(Integer.parseInt(remotePort)))){
-                        System.err.println("CONNECT: Format wrong - address:listenport sourceport");
-                        return;
-                    }
-                    if (iPort == Integer.MIN_VALUE) { // No outgoing port is set when initialization, use random
-                        socket = new Socket(remoteAddress, Integer.parseInt(remotePort));
-                    } else { // Outgoing set already, use the set outgoing port
+
+        try {
+            if (splitLine.length == 2 || splitLine.length == 3) {
+                String[] splitArg = splitLine[1].split(":");
+                if (splitArg.length != 2) { // ensure the first arg is have both address and port
+                    System.err.println("CONNECT: Format wrong - address:listenport sourceport");
+                    return;
+                }
+                String remoteAddress = splitArg[0];
+                String remotePort = splitArg[1];
+                switch (splitLine.length) {
+                    case (2): // iPort not specified
+                        if (!(isValidIP(remoteAddress) && isValidPort(remotePort))) {
+                            System.err.println("CONNECT: Format wrong - address:listenport sourceport");
+                            return;
+                        }
+                        //iPort is 0 by default, meaning random outgoing port
                         socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
-                    }
-                    break;
-                case (3):
-                    String outgoingPort = splitLine[2];
-                    // Validate the format
-                    if(!(isValidPort(Integer.parseInt(outgoingPort)) && isValidIP(remoteAddress) && isValidPort(Integer.parseInt(remotePort)))){
-                        System.out.println("CONNECT: Format wrong - address:listenport sourceport");
-                        return;
-                    }
-                    iPort = Integer.parseInt(outgoingPort);
-                    socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
-                    break;
+                        break;
+                    case (3): // iPort specified
+                        String outgoingPort = splitLine[2];
+                        if (!(isValidPort(outgoingPort) && isValidIP(remoteAddress) && isValidPort(remotePort))) {
+                            System.err.println("CONNECT: Format wrong - address:listenport sourceport");
+                            return;
+                        }
+                        iPort = Integer.parseInt(outgoingPort);
+                        socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
+                        break;
+                }
+                bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+                br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+                String localIP = InetAddress.getLocalHost().toString().split("/")[1];
+                HostChange hostChange = new HostChange(localIP + ":" + pPort);
+                bw.write(mapper.writeValueAsString(hostChange) + System.lineSeparator());
+                bw.flush();
+                ClientConnThread clientConnThread = new ClientConnThread(socket, br, this);
+                clientConnThread.start();
+                connected = true;
+                self.setUserId(localIP + ":" + socket.getLocalPort());
+            } else {
+                System.err.println("CONNECT: Wrong number of args");
             }
-            bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
-            br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-            String localIP = InetAddress.getLocalHost().toString().split("/")[1];
-            HostChange hostChange = new HostChange(localIP + ":" + pPort);
-            System.out.println(mapper.writeValueAsString(hostChange));
-            bw.write(mapper.writeValueAsString(hostChange) + System.lineSeparator());
-            bw.flush();
-            clientConnThread = new ClientConnThread(socket, br, this);
-            clientConnThread.start();
-            connected = true;
-            self.setUserId(localIP + ":" + socket.getLocalPort());
-            System.out.println(self.getUserId());//TODO: test
-        } else {
-            System.err.println("CONNECT: Wrong number of args");
+        }
+        catch (SocketException e) {
+            System.out.println("Cannot reach server.");
+            connected = false;
         }
     }
 
     private void msgLocal(String line) throws IOException {
         ChatRoom currentRoom = self.getCurrentRoom();
-        if(null == currentRoom){
-            //do nothing
-        }
-        else{
+        if(null != currentRoom){
             java.util.List<User> members = currentRoom.getMembers();
             String msg = mapper.writeValueAsString(new MessageS2C(self.getUserId(), line));
             for (User member : members) {
@@ -245,7 +254,8 @@ public class Peer {
                 }
                 member.sendMsg(msg);
             }
-            System.out.println(msg); //self msging
+
+            System.out.println(self.getUserId() + " : " + line); //self msging
         }
     }
 
@@ -309,14 +319,16 @@ public class Peer {
     private void kick(String[] splitLine) {
         if(splitLine.length == 2){
             String userToKick = splitLine[1];
-            ArrayList<User> users = server.getUsers();
+            java.util.List<User> users = server.getUsers();
             for (User user : users) {
-                if(user.getUserId().equals(userToKick)){
-                    java.util.List<User> members = user.getCurrentRoom().getMembers();
-                    members.remove(user);
-                    users.remove(user);
-                    user.setCurrentRoom(null);
+                if (user.getUserId().equals(userToKick)) {
+                    if (null != user.getCurrentRoom()) {
+                        java.util.List<User> members = user.getCurrentRoom().getMembers();
+                        members.remove(user);
+                        user.setCurrentRoom(null);
+                    }
                     user.getServerConnThread().setQuitFlag(true); // close the server conn for this user
+                    users.remove(user);
                 }
             }
         } else {
@@ -351,20 +363,39 @@ public class Peer {
         System.out.println(help);
     }
 
+    private void sendRoomchangeToEveryoneInARoom(ChatRoom destination, RoomChange roomchange) throws IOException {
+        java.util.List<User> members = destination.getMembers();
+        for (User member : members) {
+            if (member.getBw() == null) {
+                String id = roomchange.getIdentity();
+                String former = roomchange.getFormer();
+                String roomid = roomchange.getRoomid();
+                System.out.println(
+                        id + " moved from " + (former == null ? "\"\"": former)
+                                + " to " + (roomid == null ? "\"\"" : roomid)
+                );
+                continue;
+            }
+            String msg = mapper.writeValueAsString(roomchange);
+            member.sendMsg(msg);
+        }
+    }
+
     /**
      * 本地命令。
      * 没连接的状态下，
      * 1.加入本地的某房间（自己创建的）
      * 2.或者离开当前房间（设置为null）。
      */
-    private void joinLocal(String[] splitLine) {
+    private void joinLocal(String[] splitLine) throws IOException {
         if(splitLine.length == 1){
             //#join "": leaving whatever room and stay connected(in this case just leaving whatever room).
             ChatRoom roomToLeave = self.getCurrentRoom();
             if(null != roomToLeave && chatRooms.containsKey(roomToLeave.getRoomId())){
                 roomToLeave.getMembers().remove(self);
                 self.setCurrentRoom(null);
-                System.out.println("JOIN LOCAL: leaved room " + roomToLeave.getRoomId());
+                RoomChange roomChange = new RoomChange(self.getUserId(), roomToLeave.getRoomId(), "\"\"");
+                sendRoomchangeToEveryoneInARoom(roomToLeave,roomChange);
             }
             else{
                 System.err.println("JOIN LOCAL: Failed to leave current room.");
@@ -374,17 +405,24 @@ public class Peer {
             String roomToJoin = splitLine[1];
             ChatRoom currentRoom = self.getCurrentRoom();
             if(chatRooms.containsKey(roomToJoin)){
+                ChatRoom roomToJ = chatRooms.get(roomToJoin);
                 if(null != currentRoom){
                     if(currentRoom.getRoomId().equals(roomToJoin)){
                         System.err.println("JOIN LOCAL: Already in this room");
                         return;
                     }
+                    RoomChange roomChange = new RoomChange(self.getUserId(), currentRoom.getRoomId(), roomToJoin);
+                    sendRoomchangeToEveryoneInARoom(currentRoom,roomChange);
+                    sendRoomchangeToEveryoneInARoom(roomToJ,roomChange);
                     currentRoom.getMembers().remove(self);
                 }
-                ChatRoom roomToJ = chatRooms.get(roomToJoin);
-                roomToJ.getMembers().add(self);
-                self.setCurrentRoom(roomToJ);
-                System.out.println("JOIN LOCAL: Room " + roomToJoin +" joined");
+                else{ // current room is null
+                    RoomChange roomChange = new RoomChange(self.getUserId(), "", roomToJoin);
+                    sendRoomchangeToEveryoneInARoom(roomToJ,roomChange);
+                    roomToJ.getMembers().add(self);
+                    self.setCurrentRoom(roomToJ);
+                    System.out.println("JOIN LOCAL: Room " + roomToJoin +" joined");
+                }
             }else{
                 System.err.println("JOIN LOCAL: Wrong room to join");
             }
@@ -458,7 +496,7 @@ public class Peer {
      * 本地的quit命令只是把自己从当前房间退出
      * 所以直接沿用joinLocal方法。
      */
-    private void quitLocal(String[] splitLine) {
+    private void quitLocal(String[] splitLine) throws IOException {
         if(splitLine.length == 1){
             joinLocal(splitLine);
         }
@@ -528,13 +566,26 @@ public class Peer {
         }
     }
 
+    /**
+     * fetch the current room and
+     */
+    private void printCmdlineHeader(){
 
+    }
+
+    public Map<String, ChatRoom> getChatRooms() {
+        return chatRooms;
+    }
+
+    public User getSelf() {
+        return self;
+    }
 
     public Boolean getQuitFlag() {
         return quitFlag;
     }
 
-    public void setQuitFlag(boolean quitFlag) {
+    public void setQuitFlag(Boolean quitFlag) {
         this.quitFlag = quitFlag;
     }
 
@@ -556,5 +607,16 @@ public class Peer {
     private static boolean isValidPort(int port) {
         return Pattern.matches("^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
                 , String.valueOf(port));
+    }
+
+    private static boolean isValidPort(String port){
+        int numPort;
+        try{
+            numPort = Integer.parseInt(port);
+        }
+        catch (NumberFormatException e){
+            return false;
+        }
+        return isValidPort(numPort);
     }
 }
