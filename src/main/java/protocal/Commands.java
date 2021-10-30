@@ -26,6 +26,7 @@ public class Commands {
      * It will always start out locally (not on remote connection), then branch out
      */
     public static final String SEARCHNETWORK = "searchnetwork";
+    public static final String MIGRATEROOM = "migrateroom";
 
 
     /**
