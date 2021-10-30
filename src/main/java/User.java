@@ -1,5 +1,6 @@
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +31,7 @@ public class User {
 
     private final BufferedWriter bw;
     private ServerConnThread serverConnThread;
+    private Socket socket; // socket from server
 
 
     public User(String userId, ChatRoom currentRoom,  BufferedWriter bw) {
@@ -72,6 +74,14 @@ public class User {
 
     public void setServerConnThread(ServerConnThread serverConnThread) {
         this.serverConnThread = serverConnThread;
+    }
+
+    public Socket getSocket() {
+        return socket;
+    }
+
+    public void setSocket(Socket socket) {
+        this.socket = socket;
     }
 
     /**

@@ -82,12 +82,12 @@ public class ClientConnThread extends Thread{
      * Scenario 3: #quit to leave current room and disconnect
      */
     private void handleRoomChange(RoomChange roomChange) throws IOException, InterruptedException {
-        Map<String, ChatRoom> chatRooms = peer.getChatRooms();
         String roomid = roomChange.getRoomid();
         String former = roomChange.getFormer();
         String id = roomChange.getIdentity();
         User self = peer.getSelf();
         Boolean quitRemoteSent = peer.getQuitFlag();
+        Map<String, ChatRoom> chatRooms = peer.getChatRooms();
 
         if(quitRemoteSent && roomid.equals("")){ // got response for a quit command
             socket.close();

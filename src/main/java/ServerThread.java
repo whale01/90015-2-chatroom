@@ -48,15 +48,15 @@ public class ServerThread extends Thread {
                 String userIp = socket.getInetAddress().toString().split("/")[1];
                 User user = new User(userIp + ":" + userOutgoingPort, null, bw);
 
-                //TODO: TESTING ONLY
-                System.out.println(System.lineSeparator() + "Connected user id: " + user.getUserId());
-                System.out.println("socket.getRemoteSocketAddress():" + socket.getRemoteSocketAddress());
-                System.out.println("socket.getLocalSocketAddress()" + socket.getLocalSocketAddress());
+//                System.out.println(System.lineSeparator() + "Connected user id: " + user.getUserId());
+//                System.out.println("socket.getRemoteSocketAddress():" + socket.getRemoteSocketAddress());
+//                System.out.println("socket.getLocalSocketAddress()" + socket.getLocalSocketAddress());
 
                 users.add(user);
                 ServerConnThread serverConnThread = new ServerConnThread(socket, br, this, user);
                 serverConnThread.start();
                 user.setServerConnThread(serverConnThread);
+                user.setSocket(socket);
 
             }
         } catch (IOException e) {
@@ -133,6 +133,8 @@ public class ServerThread extends Thread {
             if (null != currentRoom) { // current room is not null
                 if (currentRoom.getRoomId().equals(roomidToJoin)) { // "current room" -> "current room"
                     roomChange = new RoomChange(user.getUserId(), user.getCurrentRoom().getRoomId(), user.getCurrentRoom().getRoomId());
+                    String msg = mapper.writeValueAsString(roomChange);
+                    user.sendMsg(msg);
                 } else { //"current room" -> "room to join"
                     currentRoom.getMembers().remove(user);
                     ChatRoom roomToJ = chatRooms.get(roomidToJoin);
@@ -152,12 +154,15 @@ public class ServerThread extends Thread {
         } else { //The requested room does not exist.
             if (null != currentRoom) { // "current room" -> "current room"
                 roomChange = new RoomChange(user.getUserId(), currentRoom.getRoomId(), currentRoom.getRoomId());
+                String msg = mapper.writeValueAsString(roomChange);
+                user.sendMsg(msg);
             } else { // "" -> ""
                 roomChange = new RoomChange(user.getUserId(), "", "");
+                String msg = mapper.writeValueAsString(roomChange);
+                user.sendMsg(msg);
             }
         }
-        String msg = mapper.writeValueAsString(roomChange);
-        user.sendMsg(msg);
+
     }
 
     private void sendRoomchangeToEveryoneInARoom(ChatRoom destination, RoomChange roomchange, User user) throws IOException {

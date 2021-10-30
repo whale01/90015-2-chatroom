@@ -263,9 +263,14 @@ public class Peer {
      * Send msg as a connected client.
      */
     private void msgRemote(String line) throws IOException {
-        String msg = mapper.writeValueAsString(new MessageC2S(line));
-        bw.write(msg + System.lineSeparator());
-        bw.flush();
+        try {
+            String msg = mapper.writeValueAsString(new MessageC2S(line));
+            bw.write(msg + System.lineSeparator());
+            bw.flush();
+        }
+        catch (SocketException e){
+            System.err.println("The connection has been closed.");
+        }
     }
 
     /**
@@ -316,7 +321,7 @@ public class Peer {
     /**
      * local local command
      */
-    private void kick(String[] splitLine) {
+    private void kick(String[] splitLine) throws IOException {
         if(splitLine.length == 2){
             String userToKick = splitLine[1];
             java.util.List<User> users = server.getUsers();
@@ -328,6 +333,7 @@ public class Peer {
                         user.setCurrentRoom(null);
                     }
                     user.getServerConnThread().setQuitFlag(true); // close the server conn for this user
+                    user.getSocket().close();
                     users.remove(user);
                 }
             }
@@ -435,19 +441,22 @@ public class Peer {
      * 已连接的状态下，向连到的server发送消息以加入server端指定房间。
      */
     private void joinRemote(String[] splitLine) throws IOException {
-        if(splitLine.length == 1){
-            Join join = new Join("");
-            bw.write(mapper.writeValueAsString(join) + System.lineSeparator()); //使用bw需要在消息后面加上newline才能被br.readLine()读到
-            bw.flush();
+        try {
+            if (splitLine.length == 1) {
+                Join join = new Join("");
+                bw.write(mapper.writeValueAsString(join) + System.lineSeparator()); //使用bw需要在消息后面加上newline才能被br.readLine()读到
+                bw.flush();
+            } else if (splitLine.length == 2) {
+                String roomToJoin = splitLine[1];
+                Join join = new Join(roomToJoin);
+                bw.write(mapper.writeValueAsString(join) + System.lineSeparator());
+                bw.flush();
+            } else {
+                System.err.println("JOIN REMOTE: Wrong number of args");
+            }
         }
-        else if(splitLine.length == 2){
-            String roomToJoin = splitLine[1];
-            Join join = new Join(roomToJoin);
-            bw.write(mapper.writeValueAsString(join) + System.lineSeparator());
-            bw.flush();
-        }
-        else {
-            System.err.println("JOIN REMOTE: Wrong number of args");
+        catch (SocketException e){
+            System.err.println("The connection has been closed.");
         }
 
     }
@@ -480,14 +489,18 @@ public class Peer {
 
 
     private void whoRemote(String[] splitLine) throws IOException {
-        if(splitLine.length == 2){
-            String roomToAsk = splitLine[1];
-            Who who = new Who(roomToAsk);
-            bw.write(mapper.writeValueAsString(who) + System.lineSeparator());
-            bw.flush();
+        try {
+            if (splitLine.length == 2) {
+                String roomToAsk = splitLine[1];
+                Who who = new Who(roomToAsk);
+                bw.write(mapper.writeValueAsString(who) + System.lineSeparator());
+                bw.flush();
+            } else {
+                System.err.println("WHO REMOTE: Wrong number of args");
+            }
         }
-        else{
-            System.err.println("WHO REMOTE: Wrong number of args");
+        catch (SocketException e){
+            System.err.println("The connection has been closed.");
         }
     }
 
@@ -511,13 +524,18 @@ public class Peer {
      * @param splitLine
      */
     private void quitRemote(String[] splitLine) throws IOException {
-        if(splitLine.length == 1){
-            String msg = mapper.writeValueAsString(new Quit());
-            bw.write(msg + System.lineSeparator());
-            bw.flush();
-            quitFlag = true;
-        }else{
-            System.err.println("QUIT REMOTE: No args needed");
+        try {
+            if (splitLine.length == 1) {
+                String msg = mapper.writeValueAsString(new Quit());
+                bw.write(msg + System.lineSeparator());
+                bw.flush();
+                quitFlag = true;
+            } else {
+                System.err.println("QUIT REMOTE: No args needed");
+            }
+        }
+        catch (SocketException e){
+            System.err.println("The connection has been closed.");
         }
     }
 
@@ -543,12 +561,18 @@ public class Peer {
     }
 
     private void listRemote(String[] splitLine) throws IOException {
-        if(splitLine.length == 1){
-            String msg = mapper.writeValueAsString(new List());
-            bw.write(msg + System.lineSeparator());
-            bw.flush();
-        }else {
-            System.err.println("LIST REMOTE: No args needed for #list");
+        try {
+
+            if (splitLine.length == 1) {
+                String msg = mapper.writeValueAsString(new List());
+                bw.write(msg + System.lineSeparator());
+                bw.flush();
+            } else {
+                System.err.println("LIST REMOTE: No args needed for #list");
+            }
+        }
+        catch (SocketException e){
+            System.err.println("The connection has been closed.");
         }
     }
 
@@ -561,7 +585,11 @@ public class Peer {
             System.out.println(mapper.writeValueAsString(listNeighbours));
             bw.write(mapper.writeValueAsString(listNeighbours) + System.lineSeparator());
             bw.flush();
-        } catch (IOException e) {
+        }
+        catch (SocketException e){
+            System.err.println("The connection has been closed.");
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }

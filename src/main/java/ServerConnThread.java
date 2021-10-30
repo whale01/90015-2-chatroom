@@ -42,22 +42,18 @@ public class ServerConnThread extends Thread {
                     switch (type){
                         case ("join"):
                             Join join = mapper.readValue(line, Join.class);
-                            System.out.println(line);
                             serverThread.handleJoin(join,user);
                             break;
                         case ("who"):
                             Who who = mapper.readValue(line, Who.class);
-                            System.out.println(line);
                             serverThread.handleWho(who,user);
                             break;
                         case ("list"):
                             List list = mapper.readValue(line, List.class);
-                            System.out.println(line);
                             serverThread.handleList(user);
                             break;
                         case ("quit"):
                             Quit quit = mapper.readValue(line, Quit.class);
-                            System.out.println(line);
                             serverThread.handleQuit(user);
                             quitFlag = true;
                             System.out.println("A server conn thread ended.");
