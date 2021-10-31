@@ -54,6 +54,17 @@ public class Address {
                 , String.valueOf(port));
     }
 
+    public static boolean isValidPort(String port){
+        int numPort;
+        try{
+            numPort = Integer.parseInt(port);
+        }
+        catch (NumberFormatException e){
+            return false;
+        }
+        return isValidPort(numPort);
+    }
+
     public boolean isValidAddress() {
         return isValidIP(this.IP) && isValidPort(this.port);
     }

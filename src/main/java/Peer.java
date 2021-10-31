@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.regex.Pattern;
+
 
 public class Peer {
 
@@ -93,10 +93,11 @@ public class Peer {
     }
 
     private void act() throws IOException, InterruptedException, SocketException {
-        self = new User("localhost:"+pPort,null,null); // when unconnected, the user act as the owner of the peer
         String localIP = InetAddress.getLocalHost().toString().split("/")[1];
-        self.setIpAndListeningPort(localIP + ":" + pPort);
-        server = new ServerThread(pPort, chatRooms,users);
+        Address selfAddress = new Address(localIP, pPort);
+        self = new User(selfAddress.toString(), selfAddress.toString(), null, null); // when unconnected, the user act as the owner of the peer
+        self.setAddress(localIP + ":" + pPort);
+        server = new ServerThread(this, pPort, chatRooms,users);
         server.start();
         System.out.println(" Print the identity prefix by hitting ENTER. ");
         printCmdlineHeader();
@@ -173,7 +174,10 @@ public class Peer {
                             }
                             break;
                         case Commands.SEARCHNETWORK:
+                            searchNetwork();
                             break;
+                        case Commands.MIGRATEROOM:
+                            migrateRoom(splitLine);
                         default:
                             System.out.println("INVALID COMMAND!");
                     }
@@ -183,16 +187,6 @@ public class Peer {
                     } else {
                         msgLocal(line);
                     }
-                        HashMap<String, java.util.List<Room>> result = searchNetwork();
-                        for (String address : result.keySet()) {
-                            System.out.println(address);
-                            java.util.List<Room> rooms = result.get(address);
-                            for (Room room : rooms) {
-                                System.out.println(room.getRoomid() + ": " + room.getCount());
-                            }
-                        }
-                        migrateRoom(splitLine);
-                    case Commands.MIGRATEROOM:
                 }
 //                printCmdlineHeader();
             }
@@ -221,24 +215,29 @@ public class Peer {
                     return;
                 }
                 String remoteAddress = splitArg[0];
-                String remotePort = splitArg[1];
+                // replace localhost
+                if (remoteAddress.contains("localhost")) {
+                    remoteAddress = InetAddress.getLocalHost().toString().split("/")[1];
+                }
+                int remotePort = Integer.parseInt(splitArg[1]);
                 switch (splitLine.length) {
                     case (2): // iPort not specified
-                        if (!(isValidIP(remoteAddress) && isValidPort(remotePort))) {
+                        if (!(Address.isValidIP(remoteAddress) && Address.isValidPort(remotePort))) {
                             System.err.println("CONNECT: Format wrong - address:listenport sourceport");
                             return;
                         }
+                        System.out.println(remoteAddress + remotePort);
                         //iPort is 0 by default, meaning random outgoing port
-                        socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
+                        socket = new Socket(remoteAddress, remotePort, InetAddress.getLocalHost(), iPort);
                         break;
                     case (3): // iPort specified
                         String outgoingPort = splitLine[2];
-                        if (!(isValidPort(outgoingPort) && isValidIP(remoteAddress) && isValidPort(remotePort))) {
+                        if (!(Address.isValidPort(outgoingPort) && Address.isValidIP(remoteAddress) && Address.isValidPort(remotePort))) {
                             System.err.println("CONNECT: Format wrong - address:listenport sourceport");
                             return;
                         }
                         iPort = Integer.parseInt(outgoingPort);
-                        socket = new Socket(remoteAddress, Integer.parseInt(remotePort), InetAddress.getLocalHost(), iPort);
+                        socket = new Socket(remoteAddress, remotePort, InetAddress.getLocalHost(), iPort);
                         break;
                 }
                 bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
@@ -250,8 +249,8 @@ public class Peer {
                 ClientConnThread clientConnThread = new ClientConnThread(socket, br, this);
                 clientConnThread.start();
                 connected = true;
+                connectingAddress = new Address(remoteAddress, remotePort);
                 self.setUserId(localIP + ":" + socket.getLocalPort());
-                self.setIpAndListeningPort(localIP + ":" + pPort);
             } else {
                 System.err.println("CONNECT: Wrong number of args");
             }
@@ -645,14 +644,25 @@ public class Peer {
             idStr = self.getUserId();
         }
         else{
-            idStr = self.getIpAndListeningPort();
+            idStr = self.getAddress();
         }
         System.out.printf("[%s] %s> ", currentRoomStr, idStr);
+    }
+
+    public void searchNetwork() throws IOException {
+        HashMap<String, java.util.List<Room>> result = search();
+        for (String address : result.keySet()) {
+            System.out.println(address);
+            java.util.List<Room> rooms = result.get(address);
+            for (Room room : rooms) {
+                System.out.println(room.getRoomid() + ": " + room.getCount());
+            }
+        }
     }
     /**
      * Search the network with listneighbors and list
      */
-    public HashMap<String, java.util.List<Room>> searchNetwork() throws IOException {
+    public HashMap<String, java.util.List<Room>> search() throws IOException {
         HashMap<String, java.util.List<Room>> result = new HashMap<>();
         Stack<String> toSearch = new Stack<>();
         Set<String> visited = new HashSet<>();
@@ -663,7 +673,7 @@ public class Peer {
         } else {
             // start with the connections I have
             for (User user : server.getUsers()) {
-                Address clientAdd = new Address(user.getUserId());
+                Address clientAdd = new Address(user.getAddress());
                 if (!toSearch.contains(clientAdd)) {
                     toSearch.add(clientAdd.toString());
                 }
@@ -672,12 +682,9 @@ public class Peer {
         if (toSearch.size() <= 0) {
             System.out.println("No adjacent peers to search.");
         }
-    public Map<String, ChatRoom> getChatRooms() {
-        return chatRooms;
-    }
 
-        visited.add(self.getUserId());
-        System.out.println(self.getUserId());
+        visited.add(self.getAddress());
+        System.out.println(self.getAddress());
         while (toSearch.size() > 0) {
             // connect to the address using a different socket
             Address currentAddress = new Address(toSearch.pop());
@@ -733,7 +740,7 @@ public class Peer {
     public void migrate(String roomID) throws IOException {
         // find out where to migrate to
         Stack<String> availableTargets = new Stack<>();
-        availableTargets.addAll(searchNetwork().keySet());
+        availableTargets.addAll(search().keySet());
         Address target = new Address(availableTargets.pop());
 
         // check if target is valid
@@ -758,13 +765,13 @@ public class Peer {
             Socket lsocket = new Socket(target.getIP(), target.getPort());
             BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
             // migrate start
-            MigrateStart start = new MigrateStart();
-            lbw.write();
+            MigrateStart start = new MigrateStart(chatRoom.getRoomId(), chatRoom.getMembers().size());
+//            lbw.write();
             lbw.flush();
 
             // loop through all chatrooms to migrate
-            for (ChatRoom chatRoom : toMigrate) {
-                for (User user : chatRoom.getMembers()) {
+            for (ChatRoom room: toMigrate) {
+                for (User user : room.getMembers()) {
                     // tell the user to migrate
                     MigrateRoom migrateRoom = new MigrateRoom(target.toString());
                     user.sendMsg(migrateRoom + System.lineSeparator());
@@ -801,6 +808,10 @@ public class Peer {
         this.socket = socket;
     }
 
+    public Map<String, ChatRoom> getChatRooms() {
+        return chatRooms;
+    }
+
     public Boolean getConnected() {
         return connected;
     }
@@ -809,16 +820,7 @@ public class Peer {
         return connectingAddress;
     }
 
-    private static boolean isValidPort(String port){
-        int numPort;
-        try{
-            numPort = Integer.parseInt(port);
-        }
-        catch (NumberFormatException e){
-            return false;
-        }
-        return isValidPort(numPort);
-    }
+
 
 
 }

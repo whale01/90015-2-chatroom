@@ -1,4 +1,3 @@
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import protocal.c2s.HostChange;
 import protocal.c2s.Join;
@@ -10,11 +9,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.*;
 
 public class ServerThread extends Thread {
     private ObjectMapper mapper = new ObjectMapper();
@@ -29,7 +24,7 @@ public class ServerThread extends Thread {
         return mapper;
     }
 
-    public ServerThread(Peer peer, int pPort, Map<String, ChatRoom> chatRooms) {
+    public ServerThread(Peer peer, int pPort, Map<String, ChatRoom> chatRooms, List<User> users) {
         this.peer = peer;
         this.pPort = pPort;
         this.chatRooms = chatRooms;
@@ -46,7 +41,7 @@ public class ServerThread extends Thread {
                 BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
                 int userOutgoingPort = socket.getPort();
                 String userIp = socket.getInetAddress().toString().split("/")[1];
-                User user = new User(userIp + ":" + userOutgoingPort, null, bw);
+                User user = new User(userIp + ":" + userOutgoingPort, null, null, bw);
 
 //                System.out.println(System.lineSeparator() + "Connected user id: " + user.getUserId());
 //                System.out.println("socket.getRemoteSocketAddress():" + socket.getRemoteSocketAddress());
@@ -66,8 +61,8 @@ public class ServerThread extends Thread {
 
     public void handleHostChange(HostChange hostChange, User user) {
         String host = hostChange.getHost();
-        user.setIpAndListeningPort(host);
-//        System.out.printf("Connected user hostchange: %s " + System.lineSeparator(), host);
+        user.setAddress(host);
+        System.out.printf("Connected user hostchange: %s " + System.lineSeparator(), host);
     }
 
     public void handleMsg(MessageC2S messageC2S, User user) throws IOException {
@@ -234,11 +229,19 @@ public class ServerThread extends Thread {
         Set<String> identities = new HashSet<>();
         // add the users
         for (User user: users) {
-            if (!user.getUserId().equals(currUser.getUserId())) {
-                identities.add(user.getUserId());
+            System.out.println("user:");
+            System.out.println(user.getUserId());
+            System.out.println(user.getAddress());
+            System.out.println("curr:");
+            System.out.println(currUser.getUserId());
+            System.out.println(currUser.getAddress());
+            if (!user.getAddress().equals(currUser.getAddress())) {
+                identities.add(user.getAddress());
             }
         }
+
         Address connectingAdd = getConnectingAddress();
+        System.out.println(connectingAdd);
         if (connectingAdd != null) {
             identities.add(connectingAdd.toString());
         }
@@ -247,7 +250,7 @@ public class ServerThread extends Thread {
     }
 
     /********************** helper functions **********************/
-    public ArrayList<User> getUsers() {
+    public List<User> getUsers() {
         return users;
     }
 

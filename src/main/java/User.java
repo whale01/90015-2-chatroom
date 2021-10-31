@@ -1,9 +1,6 @@
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * The User domain class.
@@ -25,7 +22,7 @@ import java.util.List;
  */
 public class User {
     private String userId; // address:source port, userid for unique identifier, and chatting prefix
-    private String ipAndListeningPort; // address:listening port, used when #listneighbors & #searchnetwork
+    private String address; // address:listening port, used when #listneighbors & #searchnetwork
 
     private ChatRoom currentRoom;
 
@@ -34,10 +31,11 @@ public class User {
     private Socket socket; // socket from server
 
 
-    public User(String userId, ChatRoom currentRoom,  BufferedWriter bw) {
+    public User(String userId, String address, ChatRoom currentRoom,  BufferedWriter bw) {
         this.userId = userId;
         this.currentRoom = currentRoom;
         this.bw = bw;
+        this.address = address;
     }
 
     public String getUserId() {
@@ -60,12 +58,14 @@ public class User {
         return bw;
     }
 
-    public String getIpAndListeningPort() {
-        return ipAndListeningPort;
+    public String getAddress() {
+        return address;
     }
 
-    public void setIpAndListeningPort(String ipAndListeningPort) {
-        this.ipAndListeningPort = ipAndListeningPort;
+    public void setAddress(String address) {
+        if (address != null) {
+            this.address = address;
+        }
     }
 
     public ServerConnThread getServerConnThread() {
