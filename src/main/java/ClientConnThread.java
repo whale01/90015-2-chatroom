@@ -119,14 +119,17 @@ public class ClientConnThread extends Thread{
                         assert chatRoom != null;
                         self.setCurrentRoom(chatRoom);
                     }
-                    System.out.println(id + " moved from " + former + " to " + roomid);
+                    System.out.println(
+                            id + " moved from " + (former.equals("") ? "\"\"": former)
+                                    + " to " + (roomid.equals("") ? "\"\"" : roomid)
+                    );
                 }
             }
         }
         else { // this roomchange has nothing to do with me
             System.out.println(
-                    id + " moved from " + (former.equals("") ? "noroom": former)
-                            + " to " + (roomid.equals("") ? "noroom " : roomid)
+                    id + " moved from " + (former.equals("") ? "\"\"": former)
+                            + " to " + (roomid.equals("") ? "\"\"" : roomid)
             );
         }
     }

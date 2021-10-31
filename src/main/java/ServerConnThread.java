@@ -31,7 +31,7 @@ public class ServerConnThread extends Thread {
 
     @Override
     public void run() {
-        System.out.println("A server conn thread started");
+//        System.out.println("A server conn thread started");
         String line = null;
         while (socket.isConnected() && !quitFlag){
             try {

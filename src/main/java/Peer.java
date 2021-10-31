@@ -400,11 +400,11 @@ public class Peer {
             if(null != roomToLeave && chatRooms.containsKey(roomToLeave.getRoomId())){
                 roomToLeave.getMembers().remove(self);
                 self.setCurrentRoom(null);
-                RoomChange roomChange = new RoomChange(self.getUserId(), roomToLeave.getRoomId(), "\"\"");
+                RoomChange roomChange = new RoomChange(self.getUserId(), roomToLeave.getRoomId(), "");
                 sendRoomchangeToEveryoneInARoom(roomToLeave,roomChange);
             }
             else{
-                System.err.println("JOIN LOCAL: Failed to leave current room.");
+                System.err.println("Failed to leave current room.");
             }
         }
         else if(splitLine.length == 2){
@@ -414,26 +414,28 @@ public class Peer {
                 ChatRoom roomToJ = chatRooms.get(roomToJoin);
                 if(null != currentRoom){
                     if(currentRoom.getRoomId().equals(roomToJoin)){
-                        System.err.println("JOIN LOCAL: Already in this room");
+                        System.err.println("Already in this room.");
                         return;
                     }
                     RoomChange roomChange = new RoomChange(self.getUserId(), currentRoom.getRoomId(), roomToJoin);
                     sendRoomchangeToEveryoneInARoom(currentRoom,roomChange);
                     sendRoomchangeToEveryoneInARoom(roomToJ,roomChange);
                     currentRoom.getMembers().remove(self);
+                    self.setCurrentRoom(roomToJ);
+                    roomToJ.getMembers().add(self);
                 }
                 else{ // current room is null
                     RoomChange roomChange = new RoomChange(self.getUserId(), "", roomToJoin);
                     sendRoomchangeToEveryoneInARoom(roomToJ,roomChange);
                     roomToJ.getMembers().add(self);
                     self.setCurrentRoom(roomToJ);
-                    System.out.println("JOIN LOCAL: Room " + roomToJoin +" joined");
+                    System.out.println(self.getUserId() + " moved to " + roomToJoin);
                 }
             }else{
-                System.err.println("JOIN LOCAL: Wrong room to join");
+                System.err.println("The requested room is invalid or non existent.");
             }
         }else{
-            System.err.println("JOIN LOCAL: Wrong number of args");
+            System.err.println("JOIN: Wrong number of args, use #help to learn");
         }
     }
 

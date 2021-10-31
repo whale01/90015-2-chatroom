@@ -67,7 +67,7 @@ public class ServerThread extends Thread {
     public void handleHostChange(HostChange hostChange, User user) {
         String host = hostChange.getHost();
         user.setIpAndListeningPort(host);
-        System.out.printf("Connected user hostchange: %s " + System.lineSeparator(), host);
+//        System.out.printf("Connected user hostchange: %s " + System.lineSeparator(), host);
     }
 
     public void handleMsg(MessageC2S messageC2S, User user) throws IOException {
@@ -173,8 +173,8 @@ public class ServerThread extends Thread {
                 String former = roomchange.getFormer();
                 String roomid = roomchange.getRoomid();
                 System.out.println(
-                        id + " moved from " + (former.equals("") ? "noroom": former)
-                                + " to " + (roomid.equals("") ? "noroom " : roomid)
+                        id + " moved from " + (former.equals("") ? "\"\"": former)
+                                + " to " + (roomid.equals("") ? "\"\"" : roomid)
                 );
                 continue;
             }
