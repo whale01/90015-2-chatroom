@@ -1,15 +1,13 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import protocal.c2s.HostChange;
-import protocal.s2c.MessageS2C;
-import protocal.s2c.RoomChange;
-import protocal.s2c.RoomContents;
-import protocal.s2c.RoomList;
+import protocal.s2c.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -33,7 +31,6 @@ public class ClientConnThread extends Thread{
 
     @Override
     public void run() {
-        System.out.println("A client conn thread started");
         String line = null;
         while (socket != null && socket.isConnected() && !quitFlag){
             try {
@@ -58,7 +55,7 @@ public class ClientConnThread extends Thread{
                             break;
                         case ("roomlist"):
                             RoomList roomList = mapper.readValue(line, RoomList.class);
-                            System.out.println(mapper.writeValueAsString(roomList));
+                            handleRoomList(roomList);
                             break;
                         case("message"):
                             MessageS2C messageS2C = mapper.readValue(line, MessageS2C.class);
@@ -134,5 +131,10 @@ public class ClientConnThread extends Thread{
         }
     }
 
+
+    private void handleRoomList(RoomList roomList) {
+        List<Room> rooms = roomList.getRooms();
+
+    }
 
 }

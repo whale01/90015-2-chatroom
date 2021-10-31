@@ -56,7 +56,6 @@ public class ServerConnThread extends Thread {
                             Quit quit = mapper.readValue(line, Quit.class);
                             serverThread.handleQuit(user);
                             quitFlag = true;
-                            System.out.println("A server conn thread ended.");
                             break;
                         case ("message"):
                             MessageC2S messageC2S = mapper.readValue(line, MessageC2S.class);

@@ -59,13 +59,7 @@ public class Peer {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-//        finally {
-//            try {
-//                socket.close();
-//            } catch (IOException e) {
-//                System.err.println("main: Failed to close socket");
-//            }
-//        }
+
     }
 
     private void parseArgs(String[] args) {
@@ -97,92 +91,103 @@ public class Peer {
 
     private void act() throws IOException, InterruptedException, SocketException {
         self = new User("localhost:"+pPort,null,null); // when unconnected, the user act as the owner of the peer
+        String localIP = InetAddress.getLocalHost().toString().split("/")[1];
+        self.setIpAndListeningPort(localIP + ":" + pPort);
         server = new ServerThread(pPort, chatRooms,users);
         server.start();
+        printCmdlineHeader();
         Scanner sc = new Scanner(System.in);
-        while (sc.hasNext()) {
-            String line = sc.nextLine();
-            if (line.startsWith("#")) { // command
-                String[] splitLine = line.strip().split(" ");
-                String command = splitLine[0].substring(1); // get the actual command
-                switch (command) {
-                    case Commands.CONNECT:
-                        connect(splitLine);
-                        break;
-                    case Commands.CREATEROOM:
-                        if(connected){
-                            System.err.println("CREATEROOM: Invalid when connected");
-                            break;
-                        }
-                        createRoom(splitLine);
-                        break;
-                    case Commands.KICK:
-                        if(connected){
-                            System.err.println("KICK: Invalid when connected");
-                            break;
-                        }
-                        kick(splitLine);
-                        break;
-                    case Commands.HELP:
-                        help(splitLine);
-                        break;
-                    case Commands.JOIN:
-                        if(connected){
-                            joinRemote(splitLine);
-                        }else{
-                            joinLocal(splitLine);
-                        }
-                        break;
-                    case Commands.WHO:
-                        if(connected){
-                            whoRemote(splitLine);
-                        }else{
-                            whoLocal(splitLine);
-                        }
-                        break;
-                    case Commands.DELETE:
-                        if(connected){
-                            System.err.println("DELETE: Invalid when connected");
-                            break;
-                        }
-                        delete(splitLine);
-                        break;
-                    case Commands.LIST:
-                        if(connected){
-                            listRemote(splitLine);
-                        }else {
-                            listLocal(splitLine);
-                        }
-                        break;
-                    case Commands.QUIT:
-                        if(connected){
-                            quitRemote(splitLine);
-                        }else{
-                            quitLocal(splitLine);
-                        }
-                        break;
-                    case Commands.LISTNEIGHBORS:
-                        if (connected) {
-                            listNeighbour();
-                        }
-                        break;
-                    case Commands.SEARCHNETWORK:
-                        break;
-                    default:
-                        System.out.println("INVALID COMMAND!");
+        try {
+            while (true) {
+                String line = sc.nextLine();
+                if (line.isEmpty()) {
+                    printCmdlineHeader();
+                    continue;
                 }
-            }
-            else{ //it's a msg, if not a command
-                if(connected){
-                    msgRemote(line);
+                if (line.startsWith("#")) { // command
+                    String[] splitLine = line.strip().split(" ");
+                    String command = splitLine[0].substring(1); // get the actual command
+                    switch (command) {
+                        case Commands.CONNECT:
+                            connect(splitLine);
+                            break;
+                        case Commands.CREATEROOM:
+                            if (connected) {
+                                System.err.println("CREATEROOM: Invalid when connected");
+                                break;
+                            }
+                            createRoom(splitLine);
+                            break;
+                        case Commands.KICK:
+                            if (connected) {
+                                System.err.println("KICK: Invalid when connected");
+                                break;
+                            }
+                            kick(splitLine);
+                            break;
+                        case Commands.HELP:
+                            help(splitLine);
+                            break;
+                        case Commands.JOIN:
+                            if (connected) {
+                                joinRemote(splitLine);
+                            } else {
+                                joinLocal(splitLine);
+                            }
+                            break;
+                        case Commands.WHO:
+                            if (connected) {
+                                whoRemote(splitLine);
+                            } else {
+                                whoLocal(splitLine);
+                            }
+                            break;
+                        case Commands.DELETE:
+                            if (connected) {
+                                System.err.println("DELETE: Invalid when connected");
+                                break;
+                            }
+                            delete(splitLine);
+                            break;
+                        case Commands.LIST:
+                            if (connected) {
+                                listRemote(splitLine);
+                            } else {
+                                listLocal(splitLine);
+                            }
+                            break;
+                        case Commands.QUIT:
+                            if (connected) {
+                                quitRemote(splitLine);
+                            } else {
+                                quitLocal(splitLine);
+                            }
+                            break;
+                        case Commands.LISTNEIGHBORS:
+                            if (connected) {
+                                listNeighbour();
+                            }
+                            break;
+                        case Commands.SEARCHNETWORK:
+                            break;
+                        default:
+                            System.out.println("INVALID COMMAND!");
+                    }
+                } else { //it's a msg
+                    if (connected) {
+                        msgRemote(line);
+                    } else {
+                        msgLocal(line);
+                    }
                 }
-                else{
-                    msgLocal(line);
-                }
-            }
-            System.out.print(">");
-        }
+                printCmdlineHeader();
 
+            }
+        }
+        catch (Exception e) {
+            sc.close();
+            System.exit(0);
+        }
     }
 
     /**
@@ -233,6 +238,7 @@ public class Peer {
                 clientConnThread.start();
                 connected = true;
                 self.setUserId(localIP + ":" + socket.getLocalPort());
+                self.setIpAndListeningPort(localIP + ":" + pPort);
             } else {
                 System.err.println("CONNECT: Wrong number of args");
             }
@@ -270,6 +276,7 @@ public class Peer {
         }
         catch (SocketException e){
             System.err.println("The connection has been closed.");
+            connected = false;
         }
     }
 
@@ -459,8 +466,8 @@ public class Peer {
         }
         catch (SocketException e){
             System.err.println("The connection has been closed.");
+            connected = false;
         }
-
     }
 
     /**
@@ -503,6 +510,7 @@ public class Peer {
         }
         catch (SocketException e){
             System.err.println("The connection has been closed.");
+            connected = false;
         }
     }
 
@@ -538,6 +546,7 @@ public class Peer {
         }
         catch (SocketException e){
             System.err.println("The connection has been closed.");
+            connected = false;
         }
     }
 
@@ -564,7 +573,6 @@ public class Peer {
 
     private void listRemote(String[] splitLine) throws IOException {
         try {
-
             if (splitLine.length == 1) {
                 String msg = mapper.writeValueAsString(new List());
                 bw.write(msg + System.lineSeparator());
@@ -575,6 +583,7 @@ public class Peer {
         }
         catch (SocketException e){
             System.err.println("The connection has been closed.");
+            connected = false;
         }
     }
 
@@ -600,7 +609,22 @@ public class Peer {
      * fetch the current room and
      */
     private void printCmdlineHeader(){
-
+        ChatRoom currentRoom = self.getCurrentRoom();
+        String currentRoomStr;
+        String idStr;
+        if (null != currentRoom){
+            currentRoomStr = currentRoom.getRoomId();
+        }
+        else{
+            currentRoomStr = "";
+        }
+        if (connected){
+            idStr = self.getUserId();
+        }
+        else{
+            idStr = self.getIpAndListeningPort();
+        }
+        System.out.printf("[%s] %s> ", currentRoomStr, idStr);
     }
 
     public Map<String, ChatRoom> getChatRooms() {

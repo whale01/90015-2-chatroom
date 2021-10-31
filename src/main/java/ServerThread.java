@@ -36,8 +36,6 @@ public class ServerThread extends Thread {
 
     @Override
     public void run() {
-        System.out.printf("\nlistening on port %d\n", pPort);
-        System.out.print(">");
         try {
             serverSocket = new ServerSocket(pPort);
             while (true) {
@@ -220,10 +218,12 @@ public class ServerThread extends Thread {
             String msg = mapper.writeValueAsString(roomChange);
             user.sendMsg(msg);
             sendRoomchangeToEveryoneInARoom(currentRoom,roomChange,user);
+            user.getServerConnThread().setQuitFlag(true);
         } else {
             users.remove(user);
             String msg = mapper.writeValueAsString(new RoomChange(user.getUserId(), "", ""));
             user.sendMsg(msg);
+            user.getServerConnThread().setQuitFlag(true);
         }
     }
 
