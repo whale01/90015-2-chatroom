@@ -117,6 +117,7 @@ public class ServerThread extends Thread {
             roomToLeave.getMembers().remove(user);
             user.setCurrentRoom(null);
             roomChange = new RoomChange(user.getUserId(), roomToLeave.getRoomId(), "");
+            sendRoomchangeToEveryoneInARoom(roomToLeave,roomChange,user);
         } else { // "" -> ""
             roomChange = new RoomChange(user.getUserId(), "", "");
         }

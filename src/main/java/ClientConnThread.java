@@ -9,6 +9,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 监听server的response，并根据response生成相关protocol类，
@@ -51,7 +52,7 @@ public class ClientConnThread extends Thread{
                             break;
                         case ("roomcontents"):
                             RoomContents roomContents = mapper.readValue(line, RoomContents.class);
-                            System.out.println(mapper.writeValueAsString(roomContents));;
+                            handleRoomContents(roomContents);
                             break;
                         case ("roomlist"):
                             RoomList roomList = mapper.readValue(line, RoomList.class);
@@ -70,6 +71,16 @@ public class ClientConnThread extends Thread{
                 }
             }
         }
+    }
+
+    private void handleRoomContents(RoomContents roomContents) {
+        String roomid = roomContents.getRoomid();
+        List<String> identities = roomContents.getIdentities();
+        System.out.print(roomid + " contains ");
+        for (String member : identities) {
+            System.out.print(member + " ");
+        }
+        System.out.println();
     }
 
     /**
@@ -134,7 +145,16 @@ public class ClientConnThread extends Thread{
 
     private void handleRoomList(RoomList roomList) {
         List<Room> rooms = roomList.getRooms();
-
+        for (Room room : rooms) {
+            String roomid = room.getRoomid();
+            int count = room.getCount();
+            if(count == 1 || count == 0){
+                System.out.println(roomid + ": " + count + " guest");
+            }
+            else{
+                System.out.println(roomid + ": " + count + " guests");
+            }
+        }
     }
 
 }

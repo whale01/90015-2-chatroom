@@ -96,6 +96,7 @@ public class Peer {
         self.setIpAndListeningPort(localIP + ":" + pPort);
         server = new ServerThread(pPort, chatRooms,users);
         server.start();
+        System.out.println(" Print the identity prefix by hitting ENTER. ");
         printCmdlineHeader();
         Scanner sc = new Scanner(System.in);
         try {
@@ -181,7 +182,7 @@ public class Peer {
                         msgLocal(line);
                     }
                 }
-
+//                printCmdlineHeader();
             }
         }
         catch (Exception e) {
@@ -196,7 +197,7 @@ public class Peer {
      */
     private void connect(String[] splitLine) throws IOException {
         if(socket != null){
-            System.err.println("CONNECT: Already have a TCP connection");
+            System.err.println(System.lineSeparator() + "CONNECT: Already have a TCP connection");
             return;
         }
 
@@ -244,7 +245,7 @@ public class Peer {
             }
         }
         catch (SocketException e) {
-            System.out.println("Cannot reach server.");
+            System.err.println("Cannot reach server.");
             connected = false;
         }
     }
@@ -358,7 +359,7 @@ public class Peer {
      * ( cannot show on windows terminal )
      */
     private void help(String[] splitLine) {
-        String help =
+        String help = System.lineSeparator() +
                     "GENERAL COMMANDS: " + System.lineSeparator() +
                             Commands.ANSI_BLUE +
                     "#help - list this info" + System.lineSeparator() +
@@ -386,7 +387,7 @@ public class Peer {
                 String id = roomchange.getIdentity();
                 String former = roomchange.getFormer();
                 String roomid = roomchange.getRoomid();
-                System.out.println(
+                System.out.println( System.lineSeparator() +
                         id + " moved from " + (former == null ? "\"\"": former)
                                 + " to " + (roomid == null ? "\"\"" : roomid)
                 );
@@ -424,7 +425,7 @@ public class Peer {
                 ChatRoom roomToJ = chatRooms.get(roomToJoin);
                 if(null != currentRoom){
                     if(currentRoom.getRoomId().equals(roomToJoin)){
-                        System.err.println("Already in this room.");
+                        System.err.println(System.lineSeparator() + "Already in this room.");
                         return;
                     }
                     RoomChange roomChange = new RoomChange(self.getUserId(), currentRoom.getRoomId(), roomToJoin);
@@ -481,15 +482,16 @@ public class Peer {
         if(splitLine.length == 2){
             String roomToCount = splitLine[1];
             if(chatRooms.containsKey(roomToCount)){
-                java.util.List members = new ArrayList<>();
-                synchronized (chatRooms) {
-                    ChatRoom roomToC = chatRooms.get(roomToCount);
-                    for (User user : roomToC.getMembers()) {
-                        members.add(user.getUserId());
-                    }
+                java.util.List<String> members = new CopyOnWriteArrayList<String>();
+                ChatRoom roomToC = chatRooms.get(roomToCount);
+                for (User user : roomToC.getMembers()) {
+                    members.add(user.getUserId());
                 }
-                String s = mapper.writeValueAsString(new RoomContents(roomToCount, members));
-                System.out.println(s);
+                System.out.print(System.lineSeparator() + roomToCount + " contains ");
+                for (String member : members) {
+                    System.out.print(member + " ");
+                }
+                System.out.println();
             }else{
                 System.err.println("WHO LOCAL: No existing room as per requested");
             }
@@ -558,17 +560,24 @@ public class Peer {
      */
     private void listLocal(String[] splitLine) throws JsonProcessingException {
         if(splitLine.length == 1){
-            java.util.List rooms = new ArrayList<>();
-            synchronized (chatRooms) {
-                for (ChatRoom chatRoom: chatRooms.values()) {
-                    String roomId = chatRoom.getRoomId();
-                    int count = chatRoom.getMembers().size();
-                    Room room = new Room(roomId,count);
-                    rooms.add(room);
+            java.util.List<Room> rooms = new CopyOnWriteArrayList<Room>();
+
+            for (ChatRoom chatRoom: chatRooms.values()) {
+                String roomId = chatRoom.getRoomId();
+                int count = chatRoom.getMembers().size();
+                Room room = new Room(roomId,count);
+                rooms.add(room);
+            }
+            for (Room room : rooms) {
+                String roomid = room.getRoomid();
+                int count = room.getCount();
+                if(count == 1 || count == 0){
+                    System.out.println(roomid + ": " + count + " guest");
+                }
+                else{
+                    System.out.println(roomid + ": " + count + " guests");
                 }
             }
-            String msg = mapper.writeValueAsString(new RoomList(rooms));
-            System.out.println(msg);
         }else{
             System.err.println("LIST LOCAL: No args needed for #list");
         }
