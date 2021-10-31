@@ -1,5 +1,6 @@
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.codehaus.plexus.util.StringUtils;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -180,7 +181,6 @@ public class Peer {
                         msgLocal(line);
                     }
                 }
-                printCmdlineHeader();
 
             }
         }
@@ -290,7 +290,10 @@ public class Peer {
     private void createRoom(String[] splitLine) {
         if (splitLine.length == 2) {
             String roomToCreate = splitLine[1];
-            //TODO: 验证roomToCreate格式
+            if (!StringUtils.isAlphanumeric(roomToCreate) || roomToCreate.length() < 3 || roomToCreate.length() >32){
+                System.err.println("CREATEROOM: Invalid room name.");
+                return;
+            }
             if (!chatRooms.containsKey(roomToCreate)) {
                 ChatRoom chatRoom = new ChatRoom(roomToCreate);
                 chatRooms.put(roomToCreate, chatRoom);
