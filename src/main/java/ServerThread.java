@@ -1,4 +1,6 @@
 import com.fasterxml.jackson.databind.ObjectMapper;
+import protocal.P2P.MigrateStart;
+import protocal.P2P.ReceiveStart;
 import protocal.c2s.HostChange;
 import protocal.c2s.Join;
 import protocal.c2s.MessageC2S;
@@ -228,20 +230,12 @@ public class ServerThread extends Thread {
         Set<String> identities = new HashSet<>();
         // add the users
         for (User user: users) {
-            System.out.println("user:");
-            System.out.println(user.getUserId());
-            System.out.println(user.getAddress());
-            System.out.println("curr:");
-            System.out.println(currUser.getUserId());
-            System.out.println(currUser.getAddress());
             if (!user.getAddress().equals(currUser.getAddress())) {
                 identities.add(user.getAddress());
             }
         }
 
         Address connectingAdd = getConnectingAddress();
-        System.out.println("connectingAddress: ");
-        System.out.println(connectingAdd);
         if (connectingAdd != null) {
             identities.add(connectingAdd.toString());
         }
@@ -268,4 +262,20 @@ public class ServerThread extends Thread {
     }
 
 
+    public void handleMigrateRoom(MigrateStart migrateStart, User user) {
+        try {
+            System.out.println("Handle migrateroom.");
+            String roomID = migrateStart.getRoomid();
+            System.out.println(roomID);
+            int count = migrateStart.getCount();
+            System.out.println(count);
+            // send back a receive start
+            ReceiveStart receiveStart = new ReceiveStart();
+            user.sendMsg(mapper.writeValueAsString(receiveStart) + System.lineSeparator());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+    }
 }

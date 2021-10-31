@@ -2,12 +2,12 @@ package protocal.P2P;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class MigrateSuccess {
+public class ReceiveStart {
 
-    @JsonProperty
-    private final String type = "migratesuccess";
+    @JsonProperty("type")
+    private final String type = "receivestart";
 
-    public MigrateSuccess() {
+    public ReceiveStart() {
     }
 
     public String getType() {

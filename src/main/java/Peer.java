@@ -1,4 +1,5 @@
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.codehaus.plexus.util.StringUtils;
 import org.kohsuke.args4j.CmdLineException;
@@ -6,6 +7,9 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import protocal.Commands;
 import protocal.P2P.MigrateStart;
+import protocal.P2P.MoveUser;
+import protocal.P2P.MoveUserSuccess;
+import protocal.P2P.ReceiveStart;
 import protocal.c2s.*;
 import protocal.c2s.List;
 import protocal.s2c.*;
@@ -57,7 +61,7 @@ public class Peer {
         peer.parseArgs(args);
         try {
             peer.act();
-        }  catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -70,18 +74,18 @@ public class Peer {
         try {
             parser.parseArgument(args);
             // check format of ports
-            if(Address.isValidPort(pPort)){
-                if(iPort != Integer.MIN_VALUE){ //iPort specified
-                    if(Address.isValidPort(iPort)){
+            if (Address.isValidPort(pPort)) {
+                if (iPort != Integer.MIN_VALUE) { //iPort specified
+                    if (Address.isValidPort(iPort)) {
                         // do nothing
                     } else {
-                        throw new CmdLineException(parser,"Port format invalid");
+                        throw new CmdLineException(parser, "Port format invalid");
                     }
                 } else { //iPort not specified
                     // do nothing
                 }
-            }else{ //pPort invalid
-                throw new CmdLineException(parser,"Port format invalid");
+            } else { //pPort invalid
+                throw new CmdLineException(parser, "Port format invalid");
             }
         } catch (CmdLineException e) {
             System.err.println(e.getMessage());
@@ -97,7 +101,7 @@ public class Peer {
         Address selfAddress = new Address(localIP, pPort);
         self = new User(selfAddress.toString(), selfAddress.toString(), null, null); // when unconnected, the user act as the owner of the peer
         self.setAddress(localIP + ":" + pPort);
-        server = new ServerThread(this, pPort, chatRooms,users);
+        server = new ServerThread(this, pPort, chatRooms, users);
         server.start();
         System.out.println(" Print the identity prefix by hitting ENTER. ");
         printCmdlineHeader();
@@ -190,8 +194,7 @@ public class Peer {
                 }
 //                printCmdlineHeader();
             }
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             sc.close();
             System.exit(0);
         }
@@ -201,8 +204,8 @@ public class Peer {
      * 接到#connect命令后，连接到指定address:port
      * 并新建一个ClientConnThread用于监听server的消息回复
      */
-    private void connect(String[] splitLine) throws IOException {
-        if(socket != null){
+    private void connect(String[] splitLine) {
+        if (socket != null) {
             System.err.println(System.lineSeparator() + "CONNECT: Already have a TCP connection");
             return;
         }
@@ -254,20 +257,21 @@ public class Peer {
             } else {
                 System.err.println("CONNECT: Wrong number of args");
             }
-        }
-        catch (SocketException e) {
+        } catch (SocketException e) {
             System.err.println("Cannot reach server.");
             connected = false;
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
     private void msgLocal(String line) throws IOException {
         ChatRoom currentRoom = self.getCurrentRoom();
-        if(null != currentRoom){
+        if (null != currentRoom) {
             java.util.List<User> members = currentRoom.getMembers();
             String msg = mapper.writeValueAsString(new MessageS2C(self.getUserId(), line));
             for (User member : members) {
-                if(member.getBw() == null){
+                if (member.getBw() == null) {
                     continue;
                 }
                 member.sendMsg(msg);
@@ -285,8 +289,7 @@ public class Peer {
             String msg = mapper.writeValueAsString(new MessageC2S(line));
             bw.write(msg + System.lineSeparator());
             bw.flush();
-        }
-        catch (SocketException e){
+        } catch (SocketException e) {
             System.err.println("The connection has been closed.");
             connected = false;
         }
@@ -302,7 +305,7 @@ public class Peer {
     private void createRoom(String[] splitLine) {
         if (splitLine.length == 2) {
             String roomToCreate = splitLine[1];
-            if (!StringUtils.isAlphanumeric(roomToCreate) || roomToCreate.length() < 3 || roomToCreate.length() >32){
+            if (!StringUtils.isAlphanumeric(roomToCreate) || roomToCreate.length() < 3 || roomToCreate.length() > 32) {
                 System.err.println("CREATEROOM: Invalid room name.");
                 return;
             }
@@ -322,9 +325,9 @@ public class Peer {
      * local local command
      */
     private void delete(String[] splitLine) {
-        if(splitLine.length == 2){
+        if (splitLine.length == 2) {
             String roomToDelete = splitLine[1];
-            if(chatRooms.containsKey(roomToDelete)){
+            if (chatRooms.containsKey(roomToDelete)) {
                 ChatRoom roomToD = chatRooms.get(roomToDelete);
                 java.util.List<User> members = roomToD.getMembers();
                 for (User member : members) {
@@ -344,7 +347,7 @@ public class Peer {
      * local local command
      */
     private void kick(String[] splitLine) throws IOException {
-        if(splitLine.length == 2){
+        if (splitLine.length == 2) {
             String userToKick = splitLine[1];
             java.util.List<User> users = server.getUsers();
             for (User user : users) {
@@ -371,23 +374,23 @@ public class Peer {
      */
     private void help(String[] splitLine) {
         String help = System.lineSeparator() +
-                    "GENERAL COMMANDS: " + System.lineSeparator() +
-                            Commands.ANSI_BLUE +
-                    "#help - list this info" + System.lineSeparator() +
-                    "#connect IP[:remote listening port] [local source port] - connect to another peer" + System.lineSeparator() +
-                    "#quit - disconnect if connected to a peer" + System.lineSeparator() +
-                    "#join [roomid] - join a room, or leave the current room but stay connected if no roomid provided" + System.lineSeparator() +
-                    "#who roomid - see who's in a room" + System.lineSeparator() +
-                    "#list - see the current server's list of rooms and head count in each room" + System.lineSeparator() +
-                    "#listneighbors - see a list of neighbor peers" + System.lineSeparator() +
-                    "#searchnetwork - see a list of rooms and info for each room on the network" + System.lineSeparator() +
-                            Commands.ANSI_RESET +
-                    "LOCAL ONLY COMMANDS: " + System.lineSeparator() +
-                            Commands.ANSI_BLUE +
-                    "#createroom roomid - create a room with a name locally" + System.lineSeparator() +
-                    "#delete roomid - delete a room and send members back to the void" + System.lineSeparator() +
-                    "#kick id - kick a user and block the user's ip from reconnecting" +
-                            Commands.ANSI_RESET;
+                "GENERAL COMMANDS: " + System.lineSeparator() +
+                Commands.ANSI_BLUE +
+                "#help - list this info" + System.lineSeparator() +
+                "#connect IP[:remote listening port] [local source port] - connect to another peer" + System.lineSeparator() +
+                "#quit - disconnect if connected to a peer" + System.lineSeparator() +
+                "#join [roomid] - join a room, or leave the current room but stay connected if no roomid provided" + System.lineSeparator() +
+                "#who roomid - see who's in a room" + System.lineSeparator() +
+                "#list - see the current server's list of rooms and head count in each room" + System.lineSeparator() +
+                "#listneighbors - see a list of neighbor peers" + System.lineSeparator() +
+                "#searchnetwork - see a list of rooms and info for each room on the network" + System.lineSeparator() +
+                Commands.ANSI_RESET +
+                "LOCAL ONLY COMMANDS: " + System.lineSeparator() +
+                Commands.ANSI_BLUE +
+                "#createroom roomid - create a room with a name locally" + System.lineSeparator() +
+                "#delete roomid - delete a room and send members back to the void" + System.lineSeparator() +
+                "#kick id - kick a user and block the user's ip from reconnecting" +
+                Commands.ANSI_RESET;
         System.out.println(help);
     }
 
@@ -398,9 +401,9 @@ public class Peer {
                 String id = roomchange.getIdentity();
                 String former = roomchange.getFormer();
                 String roomid = roomchange.getRoomid();
-                System.out.println( System.lineSeparator() +
-                        id + " moved from " + (former == null ? "\"\"": former)
-                                + " to " + (roomid == null ? "\"\"" : roomid)
+                System.out.println(System.lineSeparator() +
+                        id + " moved from " + (former == null ? "\"\"" : former)
+                        + " to " + (roomid == null ? "\"\"" : roomid)
                 );
                 continue;
             }
@@ -416,47 +419,44 @@ public class Peer {
      * 2.或者离开当前房间（设置为null）。
      */
     private void joinLocal(String[] splitLine) throws IOException {
-        if(splitLine.length == 1){
+        if (splitLine.length == 1) {
             //#join "": leaving whatever room and stay connected(in this case just leaving whatever room).
             ChatRoom roomToLeave = self.getCurrentRoom();
-            if(null != roomToLeave && chatRooms.containsKey(roomToLeave.getRoomId())){
+            if (null != roomToLeave && chatRooms.containsKey(roomToLeave.getRoomId())) {
                 roomToLeave.getMembers().remove(self);
                 self.setCurrentRoom(null);
                 RoomChange roomChange = new RoomChange(self.getUserId(), roomToLeave.getRoomId(), "");
-                sendRoomchangeToEveryoneInARoom(roomToLeave,roomChange);
-            }
-            else{
+                sendRoomchangeToEveryoneInARoom(roomToLeave, roomChange);
+            } else {
                 System.err.println("Failed to leave current room.");
             }
-        }
-        else if(splitLine.length == 2){
+        } else if (splitLine.length == 2) {
             String roomToJoin = splitLine[1];
             ChatRoom currentRoom = self.getCurrentRoom();
-            if(chatRooms.containsKey(roomToJoin)){
+            if (chatRooms.containsKey(roomToJoin)) {
                 ChatRoom roomToJ = chatRooms.get(roomToJoin);
-                if(null != currentRoom){
-                    if(currentRoom.getRoomId().equals(roomToJoin)){
+                if (null != currentRoom) {
+                    if (currentRoom.getRoomId().equals(roomToJoin)) {
                         System.err.println(System.lineSeparator() + "Already in this room.");
                         return;
                     }
                     RoomChange roomChange = new RoomChange(self.getUserId(), currentRoom.getRoomId(), roomToJoin);
-                    sendRoomchangeToEveryoneInARoom(currentRoom,roomChange);
-                    sendRoomchangeToEveryoneInARoom(roomToJ,roomChange);
+                    sendRoomchangeToEveryoneInARoom(currentRoom, roomChange);
+                    sendRoomchangeToEveryoneInARoom(roomToJ, roomChange);
                     currentRoom.getMembers().remove(self);
                     self.setCurrentRoom(roomToJ);
                     roomToJ.getMembers().add(self);
-                }
-                else{ // current room is null
+                } else { // current room is null
                     RoomChange roomChange = new RoomChange(self.getUserId(), "", roomToJoin);
-                    sendRoomchangeToEveryoneInARoom(roomToJ,roomChange);
+                    sendRoomchangeToEveryoneInARoom(roomToJ, roomChange);
                     roomToJ.getMembers().add(self);
                     self.setCurrentRoom(roomToJ);
                     System.out.println(self.getUserId() + " moved to " + roomToJoin);
                 }
-            }else{
+            } else {
                 System.err.println("The requested room is invalid or non existent.");
             }
-        }else{
+        } else {
             System.err.println("JOIN: Wrong number of args, use #help to learn");
         }
     }
@@ -478,8 +478,7 @@ public class Peer {
             } else {
                 System.err.println("JOIN REMOTE: Wrong number of args");
             }
-        }
-        catch (SocketException e){
+        } catch (SocketException e) {
             System.err.println("The connection has been closed.");
             connected = false;
         }
@@ -490,9 +489,9 @@ public class Peer {
      * 返回本地某房间内的人员。
      */
     private void whoLocal(String[] splitLine) throws JsonProcessingException {
-        if(splitLine.length == 2){
+        if (splitLine.length == 2) {
             String roomToCount = splitLine[1];
-            if(chatRooms.containsKey(roomToCount)){
+            if (chatRooms.containsKey(roomToCount)) {
                 java.util.List<String> members = new CopyOnWriteArrayList<String>();
                 ChatRoom roomToC = chatRooms.get(roomToCount);
                 for (User user : roomToC.getMembers()) {
@@ -503,11 +502,10 @@ public class Peer {
                     System.out.print(member + " ");
                 }
                 System.out.println();
-            }else{
+            } else {
                 System.err.println("WHO LOCAL: No existing room as per requested");
             }
-        }
-        else{
+        } else {
             System.err.println("WHO LOCAL: Wrong number of args");
         }
     }
@@ -523,8 +521,7 @@ public class Peer {
             } else {
                 System.err.println("WHO REMOTE: Wrong number of args");
             }
-        }
-        catch (SocketException e){
+        } catch (SocketException e) {
             System.err.println("The connection has been closed.");
             connected = false;
         }
@@ -536,10 +533,9 @@ public class Peer {
      * 所以直接沿用joinLocal方法。
      */
     private void quitLocal(String[] splitLine) throws IOException {
-        if(splitLine.length == 1){
+        if (splitLine.length == 1) {
             joinLocal(splitLine);
-        }
-        else{
+        } else {
             System.err.println("QUIT LOCAL: Wrong number of args");
         }
     }
@@ -547,6 +543,7 @@ public class Peer {
     /**
      * 远程quit
      * 发送quit消息
+     *
      * @param splitLine
      */
     private void quitRemote(String[] splitLine) throws IOException {
@@ -559,8 +556,7 @@ public class Peer {
             } else {
                 System.err.println("QUIT REMOTE: No args needed");
             }
-        }
-        catch (SocketException e){
+        } catch (SocketException e) {
             System.err.println("The connection has been closed.");
             connected = false;
         }
@@ -570,26 +566,25 @@ public class Peer {
      * 本地命令。
      */
     private void listLocal(String[] splitLine) throws JsonProcessingException {
-        if(splitLine.length == 1){
+        if (splitLine.length == 1) {
             java.util.List<Room> rooms = new CopyOnWriteArrayList<Room>();
 
-            for (ChatRoom chatRoom: chatRooms.values()) {
+            for (ChatRoom chatRoom : chatRooms.values()) {
                 String roomId = chatRoom.getRoomId();
                 int count = chatRoom.getMembers().size();
-                Room room = new Room(roomId,count);
+                Room room = new Room(roomId, count);
                 rooms.add(room);
             }
             for (Room room : rooms) {
                 String roomid = room.getRoomid();
                 int count = room.getCount();
-                if(count == 1 || count == 0){
+                if (count == 1 || count == 0) {
                     System.out.println(roomid + ": " + count + " guest");
-                }
-                else{
+                } else {
                     System.out.println(roomid + ": " + count + " guests");
                 }
             }
-        }else{
+        } else {
             System.err.println("LIST LOCAL: No args needed for #list");
         }
     }
@@ -603,8 +598,7 @@ public class Peer {
             } else {
                 System.err.println("LIST REMOTE: No args needed for #list");
             }
-        }
-        catch (SocketException e){
+        } catch (SocketException e) {
             System.err.println("The connection has been closed.");
             connected = false;
         }
@@ -618,11 +612,9 @@ public class Peer {
             ListNeighbours listNeighbours = new ListNeighbours();
             bw.write(mapper.writeValueAsString(listNeighbours) + System.lineSeparator());
             bw.flush();
-        }
-        catch (SocketException e){
+        } catch (SocketException e) {
             System.err.println("The connection has been closed.");
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -630,20 +622,18 @@ public class Peer {
     /**
      * fetch the current room and
      */
-    private void printCmdlineHeader(){
+    private void printCmdlineHeader() {
         ChatRoom currentRoom = self.getCurrentRoom();
         String currentRoomStr;
         String idStr;
-        if (null != currentRoom){
+        if (null != currentRoom) {
             currentRoomStr = currentRoom.getRoomId();
-        }
-        else{
+        } else {
             currentRoomStr = "";
         }
-        if (connected){
+        if (connected) {
             idStr = self.getUserId();
-        }
-        else{
+        } else {
             idStr = self.getAddress();
         }
         System.out.printf("[%s] %s> ", currentRoomStr, idStr);
@@ -659,101 +649,96 @@ public class Peer {
             }
         }
     }
+
     /**
      * Search the network with listneighbors and list
      */
-    public HashMap<String, java.util.List<Room>> search() throws IOException {
+    public HashMap<String, java.util.List<Room>> search() {
         HashMap<String, java.util.List<Room>> result = new HashMap<>();
         Stack<String> toSearch = new Stack<>();
         Set<String> visited = new HashSet<>();
-
-        // if connecting as client, start with the server
-        if (connected) {
-            toSearch.add(connectingAddress.toString());
-        } else {
-            // start with the connections I have
-            for (User user : server.getUsers()) {
-                Address clientAdd = new Address(user.getAddress());
-                if (!toSearch.contains(clientAdd)) {
-                    toSearch.add(clientAdd.toString());
+        try {
+            // if connecting as client, start with the server
+            if (connected) {
+                toSearch.add(connectingAddress.toString());
+            } else {
+                // start with the connections I have
+                for (User user : server.getUsers()) {
+                    Address clientAdd = new Address(user.getAddress());
+                    if (!toSearch.contains(clientAdd)) {
+                        toSearch.add(clientAdd.toString());
+                    }
                 }
             }
-        }
-        if (toSearch.size() <= 0) {
-            System.out.println("No adjacent peers to search.");
-        }
-
-        visited.add(self.getAddress());
-        System.out.println(self.getAddress());
-        while (toSearch.size() > 0) {
-            // connect to the address using a different socket
-            Address currentAddress = new Address(toSearch.pop());
-            Socket lsocket = new Socket(currentAddress.getIP(), currentAddress.getPort());
-            BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
-            BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
-            // send a hostchange with the IP and listening port of this peer
-            HostChange hostChange = new HostChange(self.getAddress());
-            lbw.write(mapper.writeValueAsString(hostChange) + System.lineSeparator());
-            lbw.flush();
-
-            // use list_neighbors to find out the neighbors
-            ListNeighbours listNeighbours = new ListNeighbours();
-            lbw.write(mapper.writeValueAsString(listNeighbours) + System.lineSeparator());
-            lbw.flush();
-            String neighborList = lbr.readLine();
-            Neighbors neighbors = mapper.readValue(neighborList, Neighbors.class);
-            java.util.List<String> ids = neighbors.getNeighbors();
-            for (String id: ids) {
-                if (!visited.contains(id)) {
-                    toSearch.add(id);
-                }
+            if (toSearch.size() <= 0) {
+                System.out.println("No adjacent peers to search.");
             }
-            visited.add(currentAddress.toString());
 
-            // use list to find out its rooms
-            List list = new List();
-            lbw.write(mapper.writeValueAsString(list) + System.lineSeparator());
-            lbw.flush();
-            // read the response
-            String roomList = lbr.readLine();
-            RoomList rooms = mapper.readValue(roomList, RoomList.class);
-            result.put(currentAddress.toString(), rooms.getRooms());
+            visited.add(self.getAddress());
+            while (toSearch.size() > 0) {
+                // connect to the address using a different socket
+                Address currentAddress = new Address(toSearch.pop());
+                Socket lsocket = new Socket(currentAddress.getIP(), currentAddress.getPort());
+                BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
+                BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
+                // send a hostchange with the IP and listening port of this peer
+                HostChange hostChange = new HostChange(self.getAddress());
+                lbw.write(mapper.writeValueAsString(hostChange) + System.lineSeparator());
+                lbw.flush();
 
-            // user sends a quit packet
-            Quit quit = new Quit();
-            lbw.write(mapper.writeValueAsString(quit) + System.lineSeparator());
-            lbw.flush();
-            // consumer the roomchange message and close the connection
-            lbr.readLine();
-            lsocket.close();
+                // use list_neighbors to find out the neighbors
+                ListNeighbours listNeighbours = new ListNeighbours();
+                lbw.write(mapper.writeValueAsString(listNeighbours) + System.lineSeparator());
+                lbw.flush();
+                String neighborList = lbr.readLine();
+                Neighbors neighbors = mapper.readValue(neighborList, Neighbors.class);
+                java.util.List<String> ids = neighbors.getNeighbors();
+                for (String id : ids) {
+                    if (!visited.contains(id)) {
+                        toSearch.add(id);
+                    }
+                }
+                visited.add(currentAddress.toString());
+
+                // use list to find out its rooms
+                List list = new List();
+                lbw.write(mapper.writeValueAsString(list) + System.lineSeparator());
+                lbw.flush();
+                // read the response
+                String roomList = lbr.readLine();
+                RoomList rooms = mapper.readValue(roomList, RoomList.class);
+                result.put(currentAddress.toString(), rooms.getRooms());
+
+                // user sends a quit packet
+                Quit quit = new Quit();
+                lbw.write(mapper.writeValueAsString(quit) + System.lineSeparator());
+                lbw.flush();
+                // consumer the roomchange message and close the connection
+                lbr.readLine();
+                lsocket.close();
+            }
+            // remove address of self
+            result.remove(self.getAddress());
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        // remove address of self
-        result.remove(self.getAddress());
         return result;
     }
 
-    public void migrateRoom(String[] splitLine) throws IOException {
+    public void migrateRoom(String[] splitLine) {
         if (splitLine.length != 2) {
             System.out.println("INVALID COMMAND: wrong number of arguments!");
+            return;
         }
-        String roomID = splitLine[2];
+        String roomID = splitLine[1];
         migrate(roomID);
     }
 
     /*
      * Migrate a room to another peer
      */
-    public void migrate(String roomID) throws IOException {
-        // find out where to migrate to
-        Stack<String> availableTargets = new Stack<>();
-        availableTargets.addAll(search().keySet());
-        Address target = new Address(availableTargets.pop());
-
-        // check if target is valid
-        if (!target.isValidAddress()) {
-            System.out.println("INVALID COMMAND!");
-            return;
-        }
+    public void migrate(String roomID) {
+        System.out.println("migrate");
 
         // 2 modes:
         // - provide ID, migrate a single room
@@ -764,32 +749,87 @@ public class Peer {
         } else {
             toMigrate.addAll(chatRooms.values());
         }
+        if (toMigrate.size() <= 0) {
+            System.out.println("No room to migrate!");
+            return;
+        }
+
+        // find out where to migrate to
+        Stack<String> availableTargets = new Stack<>();
+        availableTargets.addAll(search().keySet());
+        Address target = new Address(availableTargets.pop());
+        System.out.println("availableTargets: " + availableTargets);
+        System.out.println("target: " + target);
+
+        // check if target is valid
+        if ((target == null) || !target.isValidAddress()) {
+            System.out.println("No target to migrate room to!");
+            return;
+        }
 
         boolean success = false;
-        while (!success) {
-            ChatRoom chatRoom = toMigrate.pop();
-            Socket lsocket = new Socket(target.getIP(), target.getPort());
-            BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
-            // migrate start
-            MigrateStart start = new MigrateStart(chatRoom.getRoomId(), chatRoom.getMembers().size());
-//            lbw.write();
-            lbw.flush();
+        try {
+            while (!success) {
+                while (toMigrate.size() > 1) {
+                    ChatRoom chatRoom = toMigrate.pop();
+                    Socket lsocket = new Socket(target.getIP(), target.getPort());
+                    BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
+                    BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
+                    // migrate start
+                    MigrateStart start = new MigrateStart(chatRoom.getRoomId(), chatRoom.getMembers().size());
+                    lbw.write(mapper.writeValueAsString(start) + System.lineSeparator());
+                    lbw.flush();
+                    // check if receiving has started
+                    String line = lbr.readLine();
+                    System.out.println(line);
+                    JsonNode jsonNode = mapper.readTree(line);
+                    String type = jsonNode.get("type").asText();
+                    // something went wrong, go to next target
+                    if (!type.equals("receivestart")) {
+                        continue;
+                    }
 
-            // loop through all chatrooms to migrate
-            for (ChatRoom room: toMigrate) {
-                for (User user : room.getMembers()) {
-                    // tell the user to migrate
-                    MigrateRoom migrateRoom = new MigrateRoom(target.toString());
-                    user.sendMsg(migrateRoom + System.lineSeparator());
-                    // get the result of user migration
-                    String line = br.readLine();
+                    Boolean skip = false;
+                    // loop through all chatrooms to migrate
+                    for (ChatRoom room : toMigrate) {
+                        for (User user : room.getMembers()) {
+                            System.out.println("move user: " + user.getAddress());
+                            // tell the user to migrate
+                            MoveUser moveUser = new MoveUser(target.toString(), roomID);
+                            user.sendMsg(moveUser + System.lineSeparator());
+                            // get the result of user migration
+                            line = br.readLine();
+                            System.out.println(line);
+                            jsonNode = mapper.readTree(line);
+                            type = jsonNode.get("type").asText();
+                            if (!type.equals("moveusersuccess")) {
+                                skip = true;
+                                break;
+                            }
+                        }
+                        if (skip) {
+                            break;
+                        }
+                    }
+                    if (skip) {
+                        break;
+                    }
+
+                    // get the overall result
+                    line = lbr.readLine();
                     System.out.println(line);
                 }
             }
-            // get the overall result
+            if (success) {
+                System.out.println("Migrate success.");
+            } else {
+                System.out.println("Migrate failed.");
+            }
+        } catch (Exception e) {
+            System.out.println("Migrate failed.");
+            e.printStackTrace();
         }
     }
-
 
 
     /***************** Helper functions ************************/
@@ -825,8 +865,6 @@ public class Peer {
     public Address getConnectingAddress() {
         return connectingAddress;
     }
-
-
 
 
 }

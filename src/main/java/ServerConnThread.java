@@ -1,5 +1,6 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import protocal.P2P.MigrateStart;
 import protocal.c2s.*;
 
 import java.io.BufferedReader;
@@ -36,6 +37,7 @@ public class ServerConnThread extends Thread {
         while (socket.isConnected() && !quitFlag){
             try {
                 line = br.readLine();
+                System.out.println(line);
                 if(line != null){
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
@@ -69,6 +71,10 @@ public class ServerConnThread extends Thread {
                             System.out.println("listneighbors:");
                             System.out.println(user.getAddress());
                             serverThread.handleListNeighbour(user);
+                            break;
+                        case ("migratestart"):
+                            MigrateStart migrateStart = mapper.readValue(line, MigrateStart.class);
+                            serverThread.handleMigrateRoom(migrateStart, user);
                             break;
                     }
                 } else {
