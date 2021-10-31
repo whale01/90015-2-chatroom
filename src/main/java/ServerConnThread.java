@@ -31,7 +31,7 @@ public class ServerConnThread extends Thread {
 
     @Override
     public void run() {
-        System.out.println("A server conn thread started");
+//        System.out.println("A server conn thread started");
         String line = null;
         while (socket.isConnected() && !quitFlag){
             try {
@@ -42,34 +42,27 @@ public class ServerConnThread extends Thread {
                     switch (type){
                         case ("join"):
                             Join join = mapper.readValue(line, Join.class);
-                            System.out.println(line);
                             serverThread.handleJoin(join,user);
                             break;
                         case ("who"):
                             Who who = mapper.readValue(line, Who.class);
-                            System.out.println(line);
                             serverThread.handleWho(who,user);
                             break;
                         case ("list"):
                             List list = mapper.readValue(line, List.class);
-                            System.out.println(line);
                             serverThread.handleList(user);
                             break;
                         case ("quit"):
                             Quit quit = mapper.readValue(line, Quit.class);
-                            System.out.println(line);
                             serverThread.handleQuit(user);
                             quitFlag = true;
-                            System.out.println("A server conn thread ended.");
                             break;
                         case ("message"):
                             MessageC2S messageC2S = mapper.readValue(line, MessageC2S.class);
-//                            System.out.println(line);
                             serverThread.handleMsg(messageC2S,user);
                             break;
                         case ("hostchange"):
                             HostChange hostChange = mapper.readValue(line, HostChange.class);
-                            System.out.println(line);
                             serverThread.handleHostChange(hostChange,user);
                             break;
                         case ("listneighbors"):
@@ -85,5 +78,9 @@ public class ServerConnThread extends Thread {
                 e.printStackTrace();
             }
         }
+    }
+
+    public void setQuitFlag(Boolean quitFlag) {
+        this.quitFlag = quitFlag;
     }
 }
