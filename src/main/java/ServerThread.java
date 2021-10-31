@@ -42,11 +42,9 @@ public class ServerThread extends Thread {
                 int userOutgoingPort = socket.getPort();
                 String userIp = socket.getInetAddress().toString().split("/")[1];
                 User user = new User(userIp + ":" + userOutgoingPort, null, null, bw);
-
 //                System.out.println(System.lineSeparator() + "Connected user id: " + user.getUserId());
 //                System.out.println("socket.getRemoteSocketAddress():" + socket.getRemoteSocketAddress());
 //                System.out.println("socket.getLocalSocketAddress()" + socket.getLocalSocketAddress());
-
                 users.add(user);
                 ServerConnThread serverConnThread = new ServerConnThread(socket, br, this, user);
                 serverConnThread.start();
@@ -62,7 +60,8 @@ public class ServerThread extends Thread {
     public void handleHostChange(HostChange hostChange, User user) {
         String host = hostChange.getHost();
         user.setAddress(host);
-        System.out.printf("Connected user hostchange: %s " + System.lineSeparator(), host);
+        System.out.println(user.getUserId());
+        System.out.println(user.getAddress());
     }
 
     public void handleMsg(MessageC2S messageC2S, User user) throws IOException {
@@ -241,6 +240,7 @@ public class ServerThread extends Thread {
         }
 
         Address connectingAdd = getConnectingAddress();
+        System.out.println("connectingAddress: ");
         System.out.println(connectingAdd);
         if (connectingAdd != null) {
             identities.add(connectingAdd.toString());

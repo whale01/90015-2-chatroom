@@ -691,6 +691,10 @@ public class Peer {
             Socket lsocket = new Socket(currentAddress.getIP(), currentAddress.getPort());
             BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
             BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
+            // send a hostchange with the IP and listening port of this peer
+            HostChange hostChange = new HostChange(self.getAddress());
+            lbw.write(mapper.writeValueAsString(hostChange) + System.lineSeparator());
+            lbw.flush();
 
             // use list_neighbors to find out the neighbors
             ListNeighbours listNeighbours = new ListNeighbours();
@@ -723,6 +727,8 @@ public class Peer {
             lbr.readLine();
             lsocket.close();
         }
+        // remove address of self
+        result.remove(self.getAddress());
         return result;
     }
 

@@ -66,8 +66,9 @@ public class ServerConnThread extends Thread {
                             serverThread.handleHostChange(hostChange,user);
                             break;
                         case ("listneighbors"):
+                            System.out.println("listneighbors:");
+                            System.out.println(user.getAddress());
                             serverThread.handleListNeighbour(user);
-                            System.out.println(line);
                             break;
                     }
                 } else {
@@ -76,6 +77,7 @@ public class ServerConnThread extends Thread {
                 }
             } catch (IOException e) {
                 e.printStackTrace();
+                return;
             }
         }
     }

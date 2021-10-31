@@ -39,6 +39,7 @@ public class ClientConnThread extends Thread{
                 line = br.readLine();
             } catch (SocketException e){
                 System.err.println("Server disconnected.");
+                quitFlag = true;
             } catch (IOException e) {
                 e.printStackTrace();
             }
