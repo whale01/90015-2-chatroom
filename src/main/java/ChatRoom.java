@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ChatRoom {
     private List<User> members;
@@ -8,7 +9,7 @@ public class ChatRoom {
 
     public ChatRoom(String roomId) {
         this.roomId = roomId;
-        this.members = Collections.synchronizedList(new ArrayList<User>());
+        this.members = new CopyOnWriteArrayList<User>();
     }
 
     public List<User> getMembers() {

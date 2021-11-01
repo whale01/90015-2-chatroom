@@ -1,10 +1,13 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import protocal.P2P.MigrateStart;
+import protocal.P2P.MigrateUser;
 import protocal.c2s.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 
 /**
  * Only responsible for listening
@@ -31,55 +34,62 @@ public class ServerConnThread extends Thread {
 
     @Override
     public void run() {
-        System.out.println("A server conn thread started");
+//        System.out.println("A server conn thread started");
         String line = null;
         while (socket.isConnected() && !quitFlag){
             try {
                 line = br.readLine();
                 if(line != null){
-                    System.out.println(line);
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     switch (type){
                         case ("join"):
                             Join join = mapper.readValue(line, Join.class);
-                            System.out.println(line);
                             serverThread.handleJoin(join,user);
                             break;
                         case ("who"):
                             Who who = mapper.readValue(line, Who.class);
-                            System.out.println(line);
                             serverThread.handleWho(who,user);
                             break;
                         case ("list"):
                             List list = mapper.readValue(line, List.class);
-                            System.out.println(line);
                             serverThread.handleList(user);
                             break;
                         case ("quit"):
                             Quit quit = mapper.readValue(line, Quit.class);
-                            System.out.println(line);
                             serverThread.handleQuit(user);
                             quitFlag = true;
                             break;
                         case ("message"):
-                            //TODO
+                            MessageC2S messageC2S = mapper.readValue(line, MessageC2S.class);
+                            serverThread.handleMsg(messageC2S,user);
                             break;
                         case ("hostchange"):
                             HostChange hostChange = mapper.readValue(line, HostChange.class);
                             serverThread.handleHostChange(hostChange,user);
                             break;
                         case ("listneighbors"):
+                            System.out.println(user.getAddress());
                             serverThread.handleListNeighbour(user);
                             break;
+                        case ("migratestart"):
+                            MigrateStart migrateStart = mapper.readValue(line, MigrateStart.class);
+                            serverThread.handleMigrateRoom(migrateStart, user);
+                            break;
                     }
-                } else {
-                    System.out.println("Closing connection.");
-                    return;
                 }
-            } catch (IOException e) {
+            }
+            catch (SocketException e) {
+                System.out.printf("%s has disconnected.\n", user.getUserId());
+                return;
+            }
+            catch (Exception e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    public void setQuitFlag(Boolean quitFlag) {
+        this.quitFlag = quitFlag;
     }
 }
