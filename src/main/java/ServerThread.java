@@ -220,7 +220,6 @@ public class ServerThread extends Thread {
             user.sendMsg(msg);
             user.getServerConnThread().setQuitFlag(true);
         }
-        System.out.println("users: " + users.toString());
     }
 
     public void handleListNeighbour(User currUser) throws IOException {

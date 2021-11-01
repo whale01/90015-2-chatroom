@@ -40,7 +40,6 @@ public class ServerConnThread extends Thread {
             try {
                 line = br.readLine();
                 if(line != null){
-                    System.out.println(line);
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     switch (type){
@@ -70,12 +69,10 @@ public class ServerConnThread extends Thread {
                             serverThread.handleHostChange(hostChange,user);
                             break;
                         case ("listneighbors"):
-                            System.out.println("listneighbors:");
                             System.out.println(user.getAddress());
                             serverThread.handleListNeighbour(user);
                             break;
                         case ("migratestart"):
-                            System.out.println("migratestart");
                             MigrateStart migrateStart = mapper.readValue(line, MigrateStart.class);
                             serverThread.handleMigrateRoom(migrateStart, user);
                             break;

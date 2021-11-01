@@ -168,8 +168,8 @@ public class Peer {
                             } else {
                                 quitLocal(splitLine);
                             }
-                            // migrate all room when quit
-                            migrate(null);
+//                            // migrate all room when quit
+//                            migrate(null);
                             break;
                         case Commands.LISTNEIGHBORS:
                             if (connected) {
@@ -737,7 +737,6 @@ public class Peer {
      * Migrate a room to another peer
      */
     public void migrate(String roomID) {
-        System.out.println("migrate");
 
         // 2 modes:
         // - provide ID, migrate a single room
@@ -756,7 +755,6 @@ public class Peer {
         // find out where to migrate to
         Stack<String> availableTargets = new Stack<>();
         availableTargets.addAll(search().keySet());
-        System.out.println(availableTargets);
         if (availableTargets.size() == 0) {
             System.out.println("No target to migrate to.");
         }
@@ -770,28 +768,26 @@ public class Peer {
                 if (!target.isValidAddress()) {
                     continue;
                 }
-                System.out.println("target: " + target);
+                System.out.println("Trying to migrate to " + target.toString());
                 Socket lsocket = new Socket(target.getIP(), target.getPort());
                 BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
                 BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
 
-                Boolean skip = false;
                 // loop through all chatrooms to migrate
                 for (ChatRoom room : toMigrate) {
-                    System.out.println("Migrating " + room.getRoomId());
                     // migrate start
                     MigrateStart start;
-                    if (room.getMembers().contains(self)) {
-                        start = new MigrateStart(room.getRoomId(), room.getMembers().size() - 1);
-                    } else {
-                        start = new MigrateStart(room.getRoomId(), room.getMembers().size());
+                    // quit the room first
+                    for (User user : room.getMembers()) {
+                        if (user.getUserId().equals(self.getUserId())) {
+                            quitLocal(new String[] {"#quit"});
+                        }
                     }
-
+                    start = new MigrateStart(room.getRoomId(), room.getMembers().size());
                     lbw.write(mapper.writeValueAsString(start) + System.lineSeparator());
                     lbw.flush();
                     // check if receiving has started
                     String line = lbr.readLine();
-                    System.out.println(line);
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     // something went wrong, go to next target
@@ -807,7 +803,6 @@ public class Peer {
                         if (user.getUserId().equals(self.getUserId())) {
                             break;
                         }
-                        System.out.println("move user: " + user.getAddress());
                         // tell the user to migrate
                         MigrateUser migrateUser = new MigrateUser(target.toString(), roomID);
                         user.sendMsg(mapper.writeValueAsString(migrateUser));
@@ -823,8 +818,8 @@ public class Peer {
                     }
                 }
 
-                // wait for 10 seconds
-                long endTime = System.currentTimeMillis() + 10000;
+                // wait for 20 seconds
+                long endTime = System.currentTimeMillis() + 20000;
                 String line = null;
                 while ((line == null || line.equals("")) && System.currentTimeMillis() < endTime) {
                     // get the overall result
@@ -860,7 +855,7 @@ public class Peer {
         try {
 //            BufferedWriter tempBW = new BufferedWriter(bw);
             // first, close the current connection
-            String[] splitLine = {""};
+            String[] splitLine = {"#quit"};
             quitRemote(splitLine);
             socket = null;
 
@@ -888,11 +883,8 @@ public class Peer {
 
     public void handleMigrateRoom(MigrateStart migrateStart, User user) {
         try {
-            System.out.println("Handle migrateroom.");
             String roomID = migrateStart.getRoomid();
-            System.out.println(roomID);
             int count = migrateStart.getCount();
-            System.out.println(count);
             // already have room of the same name, return fail
             if (chatRooms.containsKey(roomID)) {
                 MigrateFail fail = new MigrateFail();
@@ -904,16 +896,16 @@ public class Peer {
             ReceiveStart receiveStart = new ReceiveStart();
             user.sendMsg(mapper.writeValueAsString(receiveStart) + System.lineSeparator());
 
-            // wait for 5 seconds or all member move the the room
-            long endTime = System.currentTimeMillis() + 5000;
+            // wait for 10 seconds or all member move the the room
+            long endTime = System.currentTimeMillis() + 10000;
             while (chatRooms.get(roomID).getMembers().size() < count && System.currentTimeMillis() < endTime);
 
             if (chatRooms.get(roomID).getMembers().size() == count) {
-                System.out.println("success");
+                System.out.println("Migrate success.");
                 MigrateSuccess migrateSuccess = new MigrateSuccess();
                 user.sendMsg(mapper.writeValueAsString(migrateSuccess));
             } else {
-                System.out.println("fail");
+                System.out.println("Migrate fail.");
                 MigrateFail migrateFail = new MigrateFail();
                 user.sendMsg(mapper.writeValueAsString(migrateFail));
             }
