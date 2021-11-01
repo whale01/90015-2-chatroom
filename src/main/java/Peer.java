@@ -6,8 +6,7 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import protocal.Commands;
-import protocal.P2P.MigrateStart;
-import protocal.P2P.MigrateUser;
+import protocal.P2P.*;
 import protocal.c2s.*;
 import protocal.c2s.List;
 import protocal.s2c.*;
@@ -169,6 +168,8 @@ public class Peer {
                             } else {
                                 quitLocal(splitLine);
                             }
+                            // migrate all room when quit
+                            migrate(null);
                             break;
                         case Commands.LISTNEIGHBORS:
                             if (connected) {
@@ -180,6 +181,7 @@ public class Peer {
                             break;
                         case Commands.MIGRATEROOM:
                             migrateRoom(splitLine);
+                            break;
                         default:
                             System.out.println("INVALID COMMAND!");
                     }
@@ -778,7 +780,13 @@ public class Peer {
                 for (ChatRoom room : toMigrate) {
                     System.out.println("Migrating " + room.getRoomId());
                     // migrate start
-                    MigrateStart start = new MigrateStart(room.getRoomId(), room.getMembers().size());
+                    MigrateStart start;
+                    if (room.getMembers().contains(self)) {
+                        start = new MigrateStart(room.getRoomId(), room.getMembers().size() - 1);
+                    } else {
+                        start = new MigrateStart(room.getRoomId(), room.getMembers().size());
+                    }
+
                     lbw.write(mapper.writeValueAsString(start) + System.lineSeparator());
                     lbw.flush();
                     // check if receiving has started
@@ -803,8 +811,6 @@ public class Peer {
                         // tell the user to migrate
                         MigrateUser migrateUser = new MigrateUser(target.toString(), roomID);
                         user.sendMsg(mapper.writeValueAsString(migrateUser));
-                        MessageS2C msg = new MessageS2C("", "hello");
-                        user.sendMsg(mapper.writeValueAsString(msg));
                         // get the result of user migration
 //                        line = br.readLine();
 //                        System.out.println(line);
@@ -817,20 +823,29 @@ public class Peer {
                     }
                 }
 
-//                // get the overall result
-//                String line = lbr.readLine();
-//                System.out.println(line);
+                // wait for 10 seconds
+                long endTime = System.currentTimeMillis() + 10000;
+                String line = null;
+                while ((line == null || line.equals("")) && System.currentTimeMillis() < endTime) {
+                    // get the overall result
+                    line = lbr.readLine();
+                }
+                JsonNode jsonNode = mapper.readTree(line);
+                if (jsonNode.get("type").asText().equals("migratesuccess")) {
+                    success = true;
+                }
 
-//                // user sends a quit packet
-//                Quit quit = new Quit();
-//                lbw.write(mapper.writeValueAsString(quit) + System.lineSeparator());
-//                lbw.flush();
-//                // consumer the roomchange message and close the connection
-//                lbr.readLine();
-//                lsocket.close();
+                // user sends a quit packet and close the connection
+                Quit quit = new Quit();
+                lbw.write(mapper.writeValueAsString(quit) + System.lineSeparator());
+                lbw.flush();
+                // consumer the roomchange message and close the connection
+                lbr.readLine();
+                lsocket.close();
             }
 
             if (success) {
+                chatRooms.remove(roomID);
                 System.out.println("Migrate success.");
             } else {
                 System.out.println("Migrate failed.");
@@ -847,15 +862,17 @@ public class Peer {
             // first, close the current connection
             String[] splitLine = {""};
             quitRemote(splitLine);
-            // then connect to the target
-            splitLine = new String[]{"#connect", target};
-            connect(splitLine);
-            // then join the room
-            splitLine = new String[]{"#join", roomID};
+            socket = null;
+
+            // if it's a local room, just join it
             if (self.getAddress().equals(target)){
-                System.out.println("join local");
+                splitLine = new String[]{"#join", roomID};
                 joinLocal(splitLine);
             } else {
+                // if not, connect to remote target first
+                splitLine = new String[]{"#connect", target};
+                connect(splitLine);
+                splitLine = new String[]{"#join", roomID};
                 joinRemote(splitLine);
             }
 //            // send moveuser success
@@ -863,11 +880,47 @@ public class Peer {
 ////            tempBW.write(mapper.writeValueAsString(moveUserSuccess) + System.lineSeparator());
 ////            tempBW.flush();
 
-
         } catch (IOException e) {
             e.printStackTrace();
         }
 
+    }
+
+    public void handleMigrateRoom(MigrateStart migrateStart, User user) {
+        try {
+            System.out.println("Handle migrateroom.");
+            String roomID = migrateStart.getRoomid();
+            System.out.println(roomID);
+            int count = migrateStart.getCount();
+            System.out.println(count);
+            // already have room of the same name, return fail
+            if (chatRooms.containsKey(roomID)) {
+                MigrateFail fail = new MigrateFail();
+                user.sendMsg(mapper.writeValueAsString(fail) + System.lineSeparator());
+                return;
+            }
+            // otherwise, create the room locally and start to receive users for the room
+            chatRooms.put(roomID, new ChatRoom(roomID));
+            ReceiveStart receiveStart = new ReceiveStart();
+            user.sendMsg(mapper.writeValueAsString(receiveStart) + System.lineSeparator());
+
+            // wait for 5 seconds or all member move the the room
+            long endTime = System.currentTimeMillis() + 5000;
+            while (chatRooms.get(roomID).getMembers().size() < count && System.currentTimeMillis() < endTime);
+
+            if (chatRooms.get(roomID).getMembers().size() == count) {
+                System.out.println("success");
+                MigrateSuccess migrateSuccess = new MigrateSuccess();
+                user.sendMsg(mapper.writeValueAsString(migrateSuccess));
+            } else {
+                System.out.println("fail");
+                MigrateFail migrateFail = new MigrateFail();
+                user.sendMsg(mapper.writeValueAsString(migrateFail));
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -904,6 +957,5 @@ public class Peer {
     public Address getConnectingAddress() {
         return connectingAddress;
     }
-
 
 }

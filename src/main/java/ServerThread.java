@@ -1,8 +1,5 @@
 import com.fasterxml.jackson.databind.ObjectMapper;
-import protocal.P2P.MigrateFail;
-import protocal.P2P.MigrateStart;
-import protocal.P2P.MigrateUser;
-import protocal.P2P.ReceiveStart;
+import protocal.P2P.*;
 import protocal.c2s.HostChange;
 import protocal.c2s.Join;
 import protocal.c2s.MessageC2S;
@@ -54,7 +51,6 @@ public class ServerThread extends Thread {
                 serverConnThread.start();
                 user.setServerConnThread(serverConnThread);
                 user.setSocket(socket);
-
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -115,7 +111,7 @@ public class ServerThread extends Thread {
             roomToLeave.getMembers().remove(user);
             user.setCurrentRoom(null);
             roomChange = new RoomChange(user.getUserId(), roomToLeave.getRoomId(), "");
-            sendRoomchangeToEveryoneInARoom(roomToLeave,roomChange,user);
+            sendRoomchangeToEveryoneInARoom(roomToLeave, roomChange, user);
         } else { // "" -> ""
             roomChange = new RoomChange(user.getUserId(), "", "");
         }
@@ -138,15 +134,15 @@ public class ServerThread extends Thread {
                     roomToJ.getMembers().add(user);
                     user.setCurrentRoom(roomToJ);
                     roomChange = new RoomChange(user.getUserId(), currentRoom.getRoomId(), roomidToJoin);
-                    sendRoomchangeToEveryoneInARoom(currentRoom,roomChange,user);
-                    sendRoomchangeToEveryoneInARoom(roomToJ,roomChange,user);
+                    sendRoomchangeToEveryoneInARoom(currentRoom, roomChange, user);
+                    sendRoomchangeToEveryoneInARoom(roomToJ, roomChange, user);
                 }
             } else { // "" -> "room to join"
                 ChatRoom roomToJ = chatRooms.get(roomidToJoin);
                 roomToJ.getMembers().add(user);
                 user.setCurrentRoom(roomToJ);
                 roomChange = new RoomChange(user.getUserId(), "", roomidToJoin);
-                sendRoomchangeToEveryoneInARoom(roomToJ,roomChange,user);
+                sendRoomchangeToEveryoneInARoom(roomToJ, roomChange, user);
             }
         } else { //The requested room does not exist.
             if (null != currentRoom) { // "current room" -> "current room"
@@ -170,7 +166,7 @@ public class ServerThread extends Thread {
                 String former = roomchange.getFormer();
                 String roomid = roomchange.getRoomid();
                 System.out.println(
-                        id + " moved from " + (former.equals("") ? "\"\"": former)
+                        id + " moved from " + (former.equals("") ? "\"\"" : former)
                                 + " to " + (roomid.equals("") ? "\"\"" : roomid)
                 );
                 continue;
@@ -216,7 +212,7 @@ public class ServerThread extends Thread {
             RoomChange roomChange = new RoomChange(user.getUserId(), currentRoom.getRoomId(), "");
             String msg = mapper.writeValueAsString(roomChange);
             user.sendMsg(msg);
-            sendRoomchangeToEveryoneInARoom(currentRoom,roomChange,user);
+            sendRoomchangeToEveryoneInARoom(currentRoom, roomChange, user);
             user.getServerConnThread().setQuitFlag(true);
         } else {
             users.remove(user);
@@ -230,7 +226,7 @@ public class ServerThread extends Thread {
     public void handleListNeighbour(User currUser) throws IOException {
         Set<String> identities = new HashSet<>();
         // add the users
-        for (User user: users) {
+        for (User user : users) {
             if (!user.getAddress().equals(currUser.getAddress())) {
                 identities.add(user.getAddress());
             }
@@ -254,35 +250,16 @@ public class ServerThread extends Thread {
      * return null if not connected
      */
     public Address getConnectingAddress() {
-         if (peer.getConnected()) {
-             return peer.getConnectingAddress();
-         } else {
-             return null;
-         }
+        if (peer.getConnected()) {
+            return peer.getConnectingAddress();
+        } else {
+            return null;
+        }
 
     }
 
-
     public void handleMigrateRoom(MigrateStart migrateStart, User user) {
-        try {
-            System.out.println("Handle migrateroom.");
-            String roomID = migrateStart.getRoomid();
-            System.out.println(roomID);
-            int count = migrateStart.getCount();
-            System.out.println(count);
-            // already have room of the same name, return fail
-            if (chatRooms.containsKey(roomID)) {
-                MigrateFail fail = new MigrateFail();
-                user.sendMsg(mapper.writeValueAsString(fail) + System.lineSeparator());
-                return;
-            }
-            // otherwise, create the room locally and start to receive users for the room
-            chatRooms.put(roomID, new ChatRoom(roomID));
-            ReceiveStart receiveStart = new ReceiveStart();
-            user.sendMsg(mapper.writeValueAsString(receiveStart) + System.lineSeparator());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        peer.handleMigrateRoom(migrateStart, user);
     }
 
 }
