@@ -227,7 +227,6 @@ public class Peer {
                             System.err.println("CONNECT: Format wrong - address:listenport sourceport");
                             return;
                         }
-                        System.out.println(remoteAddress + remotePort);
                         //iPort is 0 by default, meaning random outgoing port
                         socket = new Socket(remoteAddress, remotePort, InetAddress.getLocalHost(), iPort);
                         break;
@@ -634,7 +633,7 @@ public class Peer {
         } else {
             idStr = self.getAddress();
         }
-        System.out.printf("[%s] %s> ", currentRoomStr, idStr);
+        System.out.printf("[%s]  %s> ", currentRoomStr, idStr);
     }
 
     public void searchNetwork() throws IOException {

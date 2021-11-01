@@ -41,12 +41,12 @@ public class ClientConnThread extends Thread{
             } catch (SocketException e){
                 System.err.println("Server disconnected.");
                 quitFlag = true;
+                peer.setConnected(false);
             } catch (IOException e) {
                 e.printStackTrace();
             }
             if(null != line){
                 try {
-                    System.out.println(line);
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     switch (type){
