@@ -1,5 +1,6 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import protocal.P2P.MigrateUser;
 import protocal.c2s.HostChange;
 import protocal.c2s.ListNeighbours;
 import protocal.s2c.*;
@@ -74,7 +75,12 @@ public class ClientConnThread extends Thread{
                             String content = messageS2C.getContent();
                             System.out.println(id + " : " + content);
                             break;
-                        //TODO: case neighbors
+                        case ("migrateuser"):
+                            MigrateUser migrateUser = mapper.readValue(line, MigrateUser.class);
+                            String roomid = migrateUser.getRoomid();
+                            String target = migrateUser.getTarget();
+                            peer.moveUser(target, roomid);
+                            break;
                     }
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();

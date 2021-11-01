@@ -2,19 +2,20 @@ package protocal.P2P;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class MoveUser {
+public class MigrateUser {
 
     @JsonProperty("type")
-    private final String type = "moveuser";
+    private String type;
     @JsonProperty("target")
     private String target;
     @JsonProperty("roomid")
     private String roomid;
 
-    public MoveUser() {
+    public MigrateUser() {
     }
 
-    public MoveUser(String target, String roomid) {
+    public MigrateUser(String target, String roomid) {
+        this.type = "migrateuser";
         this.target = target;
         this.roomid = roomid;
     }

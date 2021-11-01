@@ -1,11 +1,13 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import protocal.P2P.MigrateStart;
+import protocal.P2P.MigrateUser;
 import protocal.c2s.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 
 /**
  * Only responsible for listening
@@ -37,8 +39,8 @@ public class ServerConnThread extends Thread {
         while (socket.isConnected() && !quitFlag){
             try {
                 line = br.readLine();
-                System.out.println(line);
                 if(line != null){
+                    System.out.println(line);
                     JsonNode jsonNode = mapper.readTree(line);
                     String type = jsonNode.get("type").asText();
                     switch (type){
@@ -73,17 +75,19 @@ public class ServerConnThread extends Thread {
                             serverThread.handleListNeighbour(user);
                             break;
                         case ("migratestart"):
+                            System.out.println("migratestart");
                             MigrateStart migrateStart = mapper.readValue(line, MigrateStart.class);
                             serverThread.handleMigrateRoom(migrateStart, user);
                             break;
                     }
-                } else {
-                    System.out.println("Closing connection.");
-                    return;
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
+            }
+            catch (SocketException e) {
+                System.out.printf("%s has disconnected.\n", user.getUserId());
                 return;
+            }
+            catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }

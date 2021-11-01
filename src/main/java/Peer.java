@@ -7,9 +7,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import protocal.Commands;
 import protocal.P2P.MigrateStart;
-import protocal.P2P.MoveUser;
-import protocal.P2P.MoveUserSuccess;
-import protocal.P2P.ReceiveStart;
+import protocal.P2P.MigrateUser;
 import protocal.c2s.*;
 import protocal.c2s.List;
 import protocal.s2c.*;
@@ -757,26 +755,31 @@ public class Peer {
         // find out where to migrate to
         Stack<String> availableTargets = new Stack<>();
         availableTargets.addAll(search().keySet());
-        Address target = new Address(availableTargets.pop());
-        System.out.println("availableTargets: " + availableTargets);
-        System.out.println("target: " + target);
-
-        // check if target is valid
-        if ((target == null) || !target.isValidAddress()) {
-            System.out.println("No target to migrate room to!");
-            return;
+        System.out.println(availableTargets);
+        if (availableTargets.size() == 0) {
+            System.out.println("No target to migrate to.");
         }
 
+        Address target;
         boolean success = false;
         try {
-            while (!success) {
-                while (toMigrate.size() > 1) {
-                    ChatRoom chatRoom = toMigrate.pop();
-                    Socket lsocket = new Socket(target.getIP(), target.getPort());
-                    BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
-                    BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
+            while (!success && availableTargets.size() >= 1) {
+                target = new Address(availableTargets.pop());
+                // if target is not valid, go to next one
+                if (!target.isValidAddress()) {
+                    continue;
+                }
+                System.out.println("target: " + target);
+                Socket lsocket = new Socket(target.getIP(), target.getPort());
+                BufferedReader lbr = new BufferedReader(new InputStreamReader(lsocket.getInputStream(), StandardCharsets.UTF_8));
+                BufferedWriter lbw = new BufferedWriter(new OutputStreamWriter(lsocket.getOutputStream(), StandardCharsets.UTF_8));
+
+                Boolean skip = false;
+                // loop through all chatrooms to migrate
+                for (ChatRoom room : toMigrate) {
+                    System.out.println("Migrating " + room.getRoomId());
                     // migrate start
-                    MigrateStart start = new MigrateStart(chatRoom.getRoomId(), chatRoom.getMembers().size());
+                    MigrateStart start = new MigrateStart(room.getRoomId(), room.getMembers().size());
                     lbw.write(mapper.writeValueAsString(start) + System.lineSeparator());
                     lbw.flush();
                     // check if receiving has started
@@ -786,40 +789,48 @@ public class Peer {
                     String type = jsonNode.get("type").asText();
                     // something went wrong, go to next target
                     if (!type.equals("receivestart")) {
+                        if (type.equals("migratefail")) {
+                            System.out.println("Target already have room of same ID, go to next.");
+                        }
                         continue;
                     }
 
-                    Boolean skip = false;
-                    // loop through all chatrooms to migrate
-                    for (ChatRoom room : toMigrate) {
-                        for (User user : room.getMembers()) {
-                            System.out.println("move user: " + user.getAddress());
-                            // tell the user to migrate
-                            MoveUser moveUser = new MoveUser(target.toString(), roomID);
-                            user.sendMsg(moveUser + System.lineSeparator());
-                            // get the result of user migration
-                            line = br.readLine();
-                            System.out.println(line);
-                            jsonNode = mapper.readTree(line);
-                            type = jsonNode.get("type").asText();
-                            if (!type.equals("moveusersuccess")) {
-                                skip = true;
-                                break;
-                            }
-                        }
-                        if (skip) {
+                    for (User user : room.getMembers()) {
+                        // do not move self
+                        if (user.getUserId().equals(self.getUserId())) {
                             break;
                         }
+                        System.out.println("move user: " + user.getAddress());
+                        // tell the user to migrate
+                        MigrateUser migrateUser = new MigrateUser(target.toString(), roomID);
+                        user.sendMsg(mapper.writeValueAsString(migrateUser));
+                        MessageS2C msg = new MessageS2C("", "hello");
+                        user.sendMsg(mapper.writeValueAsString(msg));
+                        // get the result of user migration
+//                        line = br.readLine();
+//                        System.out.println(line);
+//                        jsonNode = mapper.readTree(line);
+//                        type = jsonNode.get("type").asText();
+//                        if (!type.equals("moveusersuccess")) {
+//                            skip = true;
+//                            break;
+//                        }
                     }
-                    if (skip) {
-                        break;
-                    }
-
-                    // get the overall result
-                    line = lbr.readLine();
-                    System.out.println(line);
                 }
+
+//                // get the overall result
+//                String line = lbr.readLine();
+//                System.out.println(line);
+
+//                // user sends a quit packet
+//                Quit quit = new Quit();
+//                lbw.write(mapper.writeValueAsString(quit) + System.lineSeparator());
+//                lbw.flush();
+//                // consumer the roomchange message and close the connection
+//                lbr.readLine();
+//                lsocket.close();
             }
+
             if (success) {
                 System.out.println("Migrate success.");
             } else {
@@ -829,6 +840,35 @@ public class Peer {
             System.out.println("Migrate failed.");
             e.printStackTrace();
         }
+    }
+
+    public void moveUser(String target, String roomID) {
+        try {
+//            BufferedWriter tempBW = new BufferedWriter(bw);
+            // first, close the current connection
+            String[] splitLine = {""};
+            quitRemote(splitLine);
+            // then connect to the target
+            splitLine = new String[]{"#connect", target};
+            connect(splitLine);
+            // then join the room
+            splitLine = new String[]{"#join", roomID};
+            if (self.getAddress().equals(target)){
+                System.out.println("join local");
+                joinLocal(splitLine);
+            } else {
+                joinRemote(splitLine);
+            }
+//            // send moveuser success
+////            MoveUserSuccess moveUserSuccess = new MoveUserSuccess();
+////            tempBW.write(mapper.writeValueAsString(moveUserSuccess) + System.lineSeparator());
+////            tempBW.flush();
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
 

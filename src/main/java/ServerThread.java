@@ -1,5 +1,7 @@
 import com.fasterxml.jackson.databind.ObjectMapper;
+import protocal.P2P.MigrateFail;
 import protocal.P2P.MigrateStart;
+import protocal.P2P.MigrateUser;
 import protocal.P2P.ReceiveStart;
 import protocal.c2s.HostChange;
 import protocal.c2s.Join;
@@ -62,8 +64,6 @@ public class ServerThread extends Thread {
     public void handleHostChange(HostChange hostChange, User user) {
         String host = hostChange.getHost();
         user.setAddress(host);
-        System.out.println(user.getUserId());
-        System.out.println(user.getAddress());
     }
 
     public void handleMsg(MessageC2S messageC2S, User user) throws IOException {
@@ -224,6 +224,7 @@ public class ServerThread extends Thread {
             user.sendMsg(msg);
             user.getServerConnThread().setQuitFlag(true);
         }
+        System.out.println("users: " + users.toString());
     }
 
     public void handleListNeighbour(User currUser) throws IOException {
@@ -269,13 +270,19 @@ public class ServerThread extends Thread {
             System.out.println(roomID);
             int count = migrateStart.getCount();
             System.out.println(count);
-            // send back a receive start
+            // already have room of the same name, return fail
+            if (chatRooms.containsKey(roomID)) {
+                MigrateFail fail = new MigrateFail();
+                user.sendMsg(mapper.writeValueAsString(fail) + System.lineSeparator());
+                return;
+            }
+            // otherwise, create the room locally and start to receive users for the room
+            chatRooms.put(roomID, new ChatRoom(roomID));
             ReceiveStart receiveStart = new ReceiveStart();
             user.sendMsg(mapper.writeValueAsString(receiveStart) + System.lineSeparator());
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-
     }
+
 }
